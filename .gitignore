@@ -1,0 +1,7 @@
+flask_env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+MDB
+*.csv
