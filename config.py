@@ -6,9 +6,6 @@ class Config:
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
     UPLOAD_FOLDER = 'uploads'
     
-    # Default paths
-    DEFAULT_IMAGE_PATH = r"C:\Users\Samir.Tak\Desktop\Workspace\Electrical Drawings\line-detection\MDB\raw"
-    
     # Allowed extensions
     ALLOWED_EXTENSIONS = {'pdf', 'xml'}
     
