@@ -186,6 +186,10 @@ def favicon():
         mimetype='image/vnd.microsoft.icon'
     )
 
+@main.route('/agent')
+def agent():
+    return render_template('test.html')
+    
 @main.route('/download_csv/<data_type>')
 def download_csv(data_type):
     """Endpoint to download CSV files"""
