@@ -619,7 +619,7 @@
 
         .table-wrapper {
             overflow-x: auto;
-            max-height: 400px;
+            max-height: 100vh;
             overflow-y: auto;
         }
 
@@ -628,12 +628,15 @@
             border-collapse: collapse;
         }
 
-        th, td {
+        th{
             padding: 15px 20px;
             text-align: left;
             border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         }
-
+        td {
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
         th {
             background: rgb(182, 192, 235);
             font-weight: 700;
@@ -1051,6 +1054,35 @@
             transform: scale(0.97);
             box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
         }
+        .row-highlight {
+            background-color: #f8d7da !important; /* light red */
+        }
+        .row-highlight-success {
+            background-color: #dcf8d7 !important; /* light green */
+        }
+        .row-right {
+            background-color: #c8f7c5 !important; /* light green */
+        }
+        .row-wrong {
+            background-color: #f7c5c5 !important; /* light red */
+        }
+        .btn-right {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 3px 6px;
+            margin-right: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .btn-wrong {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 3px 6px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
 
     </style>
 </head>
@@ -1070,11 +1102,11 @@
                         📄 Choose PDF File
                     </label>
                 </div>
-                <div id="xml-files-container"></div>
+                <!-- <div id="xml-files-container"></div>
 
                 <button type="button" id="add-xml-btn" class="add-xml-btn">
                     ➕ Add XML File
-                </button>
+                </button> -->
 
                 <!-- <div class="file-input-wrapper">
                     <input type="file" name="xml_file" id="xml-file" accept="application/xml">
@@ -1095,7 +1127,7 @@
             <!-- File selection status -->
             <div id="file-status" class="file-status">
                 <div id="pdf-file-status">PDF: Not selected</div>
-                <div id="xml-file-status">XML: Not selected</div>
+                <!-- <div id="xml-file-status">XML: Not selected</div> -->
             </div>
 
             <!-- Debug information -->
@@ -1251,7 +1283,6 @@
             </div>
         </div>
     </div>
-    <iframe src="https://copilotstudio.microsoft.com/environments/8250a9bf-eb76-ef4c-ba38-b14a0bb0110c/bots/cr673_websiteAssistant/webchat?__version__=2" frameborder="0" style="width: 100%; height: 100%;"></iframe>
     <script>
         // PDF.js setup
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1260,7 +1291,7 @@
         let currentPdfPage = 1;
         let totalPdfPages = 1;
         let isSelectionMode = false;
-        const imagesPerPage = 10;
+        const imagesPerPage = 20;
         let selectedPages = new Set();
         let sampleData = {};
         let currentPage = 1;
@@ -1764,7 +1795,7 @@
             thead.innerHTML = "";
             tbody.innerHTML = "";
 
-            if (data.length === 0) return;
+            if (data == undefined ||data.length === 0) return;
 
             // Create header
             const headerRow = document.createElement('tr');
@@ -1788,35 +1819,152 @@
         }
 
         // Populate connection data table
-        function populateConnectionTable(data) {
-            const thead = document.getElementById('connection-thead');
-            const tbody = document.getElementById('connection-tbody');
-            thead.innerHTML = "";
-            tbody.innerHTML = "";
+        // function populateConnectionTable(data) {
+        //     const thead = document.getElementById('connection-thead');
+        //     const tbody = document.getElementById('connection-tbody');
+        //     thead.innerHTML = "";
+        //     tbody.innerHTML = "";
 
-            if (data.length === 0) return;
+        //     if (data.length === 0) return;
 
-            // Create header
-            const headerRow = document.createElement('tr');
-            Object.keys(data[0]).forEach(key => {
+        //     // Create header
+        //     const headerRow = document.createElement('tr');
+        //     Object.keys(data[0]).forEach(key => {
+        //         const th = document.createElement('th');
+        //         th.textContent = key.replace('_', ' ').toUpperCase();
+        //         headerRow.appendChild(th);
+        //     });
+        //     thead.appendChild(headerRow);
+
+        //     // Create rows
+        //     data.forEach(row => {
+        //         const tr = document.createElement('tr');
+        //         Object.values(row).forEach(value => {
+        //             const td = document.createElement('td');
+        //             td.textContent = value;
+        //             tr.appendChild(td);
+        //         });
+        //         tbody.appendChild(tr);
+        //     });
+        // }
+
+    function populateConnectionTable(data) {
+        console.log('Populating connection table with data:', data);
+        const columnOrder = [
+            "source_component",
+            "source_terminal",
+            "dest_component",
+            "dest_terminal",
+            "wire_no",
+            "page_number",
+            "reason" // add reason column
+        ];
+        if (data == undefined || data.length === 0) return;
+
+
+        data = data.map(row => {
+            const reorderedRow = {};
+            columnOrder.forEach(col => {
+                if (row.hasOwnProperty(col)) {
+                    reorderedRow[col] = row[col];
+                }
+            });
+            // Add defaults
+            reorderedRow.selected = "";
+            reorderedRow.reason = reorderedRow.reason || ""; // default empty
+            return reorderedRow;
+        });
+
+        const thead = document.getElementById('connection-thead');
+        const tbody = document.getElementById('connection-tbody');
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+
+        // Create header
+        const headerRow = document.createElement('tr');
+        Object.keys(data[0]).forEach(key => {
+            if (key !== "selected") { // don't display selected as a column
                 const th = document.createElement('th');
                 th.textContent = key.replace('_', ' ').toUpperCase();
                 headerRow.appendChild(th);
-            });
-            thead.appendChild(headerRow);
+            }
+        });
+        headerRow.appendChild(document.createElement('th')); // for action buttons
+        thead.appendChild(headerRow);
 
-            // Create rows
-            data.forEach(row => {
-                const tr = document.createElement('tr');
-                Object.values(row).forEach(value => {
+        // Create rows
+        data.forEach((row, rowIndex) => {
+            const tr = document.createElement('tr');
+            Object.entries(row).forEach(([key, value]) => {
+                if (key !== "selected") {
                     const td = document.createElement('td');
-                    td.textContent = value;
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
-        }
 
+                    if (key === "reason") {
+                        // input box for reason
+                        const input = document.createElement('input');
+                        input.type = "text";
+                        input.value = value;
+                        input.placeholder = "Enter reason";
+                        input.addEventListener('input', (e) => {
+                            data[rowIndex].reason = e.target.value;
+                        });
+                        // prevent row click when focusing or clicking inside input
+                        input.addEventListener('click', (e) => e.stopPropagation());
+                        td.appendChild(input);
+                    } else {
+                        td.textContent = value;
+                    }
+
+                    tr.appendChild(td);
+                }
+            });
+
+            tr.addEventListener('click', () => {
+                const wireNo = row["wire_no"];  // adjust if key is different
+                const imageName = `Wire ${wireNo}`;
+                const imgIndex = currentDisplayedImages.findIndex(img => img.name === imageName);
+
+                if (imgIndex !== -1) {
+                    openOverlay(imgIndex, currentDisplayedImages[imgIndex]);
+                } else {
+                    console.warn(`No image found for ${imageName} in currentDisplayedImages`);
+                }
+            });
+
+            // Add buttons for "selected"
+            const actionTd = document.createElement('td');
+
+            const rightBtn = document.createElement('button');
+            rightBtn.textContent = "Right";
+            rightBtn.className = "btn-right";
+            rightBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tr.classList.remove('row-wrong');
+                tr.classList.add('row-right');
+                data[rowIndex].selected = "True";
+            });
+
+            const wrongBtn = document.createElement('button');
+            wrongBtn.textContent = "Wrong";
+            wrongBtn.className = "btn-wrong";
+            wrongBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tr.classList.remove('row-right');
+                tr.classList.add('row-wrong');
+                data[rowIndex].selected = "False";
+            });
+
+            actionTd.appendChild(rightBtn);
+            actionTd.appendChild(wrongBtn);
+            tr.appendChild(actionTd);
+
+            tbody.appendChild(tr);
+        });
+
+        // store back modified data (so downloadCSV can use it)
+        sampleData.connectionData = data;
+    }
         function loadAnalysisImages() {
             const container = document.getElementById('analysis-images');
             container.innerHTML = ""; // clear old content
@@ -1882,6 +2030,7 @@
         let currentImagePage = 1; // image pagination within a PDF page
         
         function initializePagination(images) {
+            if (images==undefined) return;
             groupedImages = groupImagesByPage(images);
             pageKeys = Object.keys(groupedImages).sort((a, b) => a - b); 
             currentPageIndex = 0;
@@ -1895,10 +2044,9 @@
         function displayImagesForPage(pageIndex, imagePage) {
             const grid = document.getElementById('images-grid');
             grid.innerHTML = '';
-
             const currentPageNum = pageKeys[pageIndex];
             const images = groupedImages[currentPageNum];
-
+            let imagesPerPage = images.length;
             const totalImagePages = Math.ceil(images.length / imagesPerPage);
 
             const startIndex = (imagePage - 1) * imagesPerPage;
@@ -2068,7 +2216,7 @@
                 filename = 'connection_analysis.csv';
             }
 
-            if (data.length === 0) return;
+            if (data == undefined ||data.length === 0) return;
 
             const headers = Object.keys(data[0]);
             const csvContent = [

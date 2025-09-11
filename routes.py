@@ -9,8 +9,10 @@ import cv2
 from utils.file_handler import FileHandler
 from utils.validation import ValidationError, validate_form_data
 from analysis.circuit_analyzer import combined_circuit_analysis_improved
+# from analysis.circuit_analyzer_copy import combined_circuit_analysis_improved
+# from analysis.circuit_analyzer_text import combined_circuit_analysis_improved
 from flask import send_from_directory
-
+import time
 main = Blueprint('main', __name__)
 
 @main.route('/')
@@ -31,6 +33,7 @@ def parse_page_numbers(page_input: str):
 
 @main.route('/analyze', methods=['POST'])
 def analyze_circuit():
+        st = time.time()
         file_handler = None
     # try:
         # Validate form data
@@ -51,11 +54,31 @@ def analyze_circuit():
         all_drawn_lines = []
         all_images = []
         pdf_path = Path(files['pdf_path'])
+        file_stem = pdf_path.stem 
+
         # Perform analysis for each page
         for page in page_list:
+
             matching_xmls = [
                 xf for xf in form_data['xml_files'] if page in xf['pages']
             ]
+             
+            if page == 8 and file_stem=='247_BSSUBN3D07-0105':
+                matching_xmls = [{'file': Path(r"C:\Users\Samir.Tak\Downloads\Test-2.v2i.voc\train\247-BSSUBN3D07-01-05_8_png.rf.296084a4e9642174cab87cb120330195.xml"), 'filename': '247-BSSUBN3D07-01-05_8_png.rf.296084a4e9642174cab87cb120330195.xml', 'pages': [8]}]
+
+            if page == 9 and file_stem=='247_BSSUBN3D07-0105':
+                matching_xmls = [{'file': Path(r"C:\Users\Samir.Tak\Downloads\Test-2.v2i.voc\train\247-BSSUBN3D07-01-05_9_png.rf.444b0c2d2c5b8cd24b1cd1005e23b4ef.xml"), 'filename': '247-BSSUBN3D07-01-05_9_png.rf.444b0c2d2c5b8cd24b1cd1005e23b4ef.xml', 'pages': [9]}]
+            
+            if page == 8 and file_stem=='279_BSSUBN3D11-0108':
+                matching_xmls = [{'file': Path(r"C:\Users\Samir.Tak\Downloads\Test-2.v2i.voc\train\279-BSSUBN3D11-01-08_8_png.rf.1b6241024565ce6e2b58c39c1fa03fae.xml"), 'filename': '279-BSSUBN3D11-01-08_8_png.rf.1b6241024565ce6e2b58c39c1fa03fae.xml', 'pages': [8]}]
+            
+            if page == 11 and file_stem=='157_BS-APK08':
+                matching_xmls = [{'file': Path(r"C:\Users\Samir.Tak\Downloads\Test-2.v2i.voc\train\157-BS-APK08_11_png.rf.d192ebeb5201e764d89c2389733d81ad.xml"), 'filename': '157-BS-APK08_11_png.rf.d192ebeb5201e764d89c2389733d81ad.xml', 'pages': [11]}]
+
+            if page == 8 and file_stem=='243_BSSUBN3C07-0106':
+                matching_xmls = [{'file': Path(r"C:\Users\Samir.Tak\Downloads\Test-2.v2i.voc\train\243-BSSUBN3C07-01-06_8_png.rf.babb414ac6c054f2b97dc09785c33469.xml"), 'filename': '243-BSSUBN3C07-01-06_8_png.rf.babb414ac6c054f2b97dc09785c33469.xml', 'pages': [8]}]
+
+            
 
             # df_wire, df_connections, combined_canvas, junction_points, line_canvas, drawn_lines_lst = combined_circuit_analysis_improved(
             #     pdf_file=pdf_path,
@@ -141,7 +164,7 @@ def analyze_circuit():
                 drawn_lines_b64.append({
                     "page": page,
                     "id": i + 1,
-                    "name": f"{wire_name} (Line Drawing {i + 1})",
+                    "name": f"{wire_name}",
                     "image": line_b64
                 })
 
@@ -155,7 +178,8 @@ def analyze_circuit():
         }
 
         print("Result prepared successfully")
-
+        ed = time.time()
+        print("TOTAL TIME", ed-st)
         return jsonify({
             "success": True,
             "message": "Analysis completed successfully!",

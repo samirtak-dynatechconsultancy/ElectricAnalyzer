@@ -160,7 +160,7 @@ def draw_connections_from_df(wire_df, img):
         # Connect first point to all others in blue
         source_point = tuple(points[0])
         for target_point in points[1:]:
-            cv2.line(copy_img, source_point, tuple(target_point), (255, 0, 0), 2)
+            cv2.line(copy_img, source_point, tuple(target_point), (0, 0, 255), 2)
 
         # Add to list
         images_list.append((wire_name, copy_img))
