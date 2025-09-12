@@ -12,6 +12,7 @@ import pandas as pd
 import csv
 import string
 import numpy as np
+from ultralytics import YOLO
 
 
 JUNCTION_INTERSECTION_THRESHOLD = 15  # Distance threshold for wire-junction intersections
@@ -20,6 +21,9 @@ JUNCTION_PARAM_THRESHOLD_START = 0.8 # Parameter threshold for detecting junctio
 JUNCTION_PARAM_THRESHOLD_END = 0.5   # Parameter threshold for detecting junction at wire end
 MIN_LENGTH = 30
 zoom = 4.0
+best_model = YOLO('models/best.pt')
+
+
 def load_voc_boxes(voc_path):
     tree = ET.parse(voc_path)
     root = tree.getroot()
@@ -1471,9 +1475,9 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     Improved combined function with better flow analysis
     wire_connection_threshold: Distance threshold for detecting wire endpoint connections
     """
-    bounding_boxes = []
-    if xml is not None:
-        bounding_boxes = load_voc_boxes(xml)
+    # bounding_boxes = []
+    # if xml is not None:
+    #     bounding_boxes = load_voc_boxes(xml)
     # print(f"Loaded {len(bounding_boxes)} bounding boxes from XML")
     doc = fitz.open(pdf_file)
     fitz_page = doc[page_no - 1]
@@ -1499,6 +1503,29 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         # Default crop parameters
         x, y, w, h = 60, 57, 3249, 2028
         cropped_img = img[y:y+h, x:x+w]
+    
+    # Should be in this format: boxes.append((xmin, ymin, xmax, ymax, name))
+    # bounding_boxes = 
+    confidence = 0.5
+
+    results = best_model.predict(
+        source=img_cv,
+        conf=confidence,
+        save=False,
+        verbose=False
+    )
+
+    # Extract bounding boxes
+    bounding_boxes = []
+    for result in results:
+        boxes = result.boxes
+        for box in boxes:
+            xyxy = box.xyxy.cpu().numpy()[0]  # [xmin, ymin, xmax, ymax]
+            cls_id = int(box.cls.cpu().numpy()[0])
+            class_name = result.names[cls_id]
+            xmin, ymin, xmax, ymax = xyxy
+            bounding_boxes.append((xmin, ymin, xmax, ymax, class_name))
+
     # cropped_img = img.copy()
     # print(f"Image cropped to region: x={x}, y={y}, w={w}, h={h}")
 
