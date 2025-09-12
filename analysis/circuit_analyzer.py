@@ -12,16 +12,23 @@ import pandas as pd
 import csv
 import string
 import numpy as np
+import os
 from ultralytics import YOLO
 
+# Get the directory where the current script is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Build the absolute path to your model
+MODEL_PATH = os.path.join(BASE_DIR, "models", "best.pt")
+
+# Load the model
+best_model = YOLO(MODEL_PATH)
 JUNCTION_INTERSECTION_THRESHOLD = 15  # Distance threshold for wire-junction intersections
 WIRE_CONNECTION_THRESHOLD = 15        # Distance threshold for wire endpoint connections
 JUNCTION_PARAM_THRESHOLD_START = 0.8 # Parameter threshold for detecting junction at wire start
 JUNCTION_PARAM_THRESHOLD_END = 0.5   # Parameter threshold for detecting junction at wire end
 MIN_LENGTH = 30
 zoom = 4.0
-best_model = YOLO('models/best.pt')
 
 
 def load_voc_boxes(voc_path):
@@ -1509,7 +1516,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     confidence = 0.5
 
     results = best_model.predict(
-        source=img_cv,
+        source=cropped_img,
         conf=confidence,
         save=False,
         verbose=False
@@ -1523,7 +1530,10 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             xyxy = box.xyxy.cpu().numpy()[0]  # [xmin, ymin, xmax, ymax]
             cls_id = int(box.cls.cpu().numpy()[0])
             class_name = result.names[cls_id]
-            xmin, ymin, xmax, ymax = xyxy
+
+            # Cast to native Python float
+            xmin, ymin, xmax, ymax = [int(v) for v in xyxy]
+
             bounding_boxes.append((xmin, ymin, xmax, ymax, class_name))
 
     # cropped_img = img.copy()
@@ -1789,6 +1799,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 unique_id = get_unique_component_id(component_name, bbox_coords)
 
                 # Draw rectangle
+                
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
                 # Put text (ID)
