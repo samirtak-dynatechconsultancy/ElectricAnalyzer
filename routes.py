@@ -263,6 +263,65 @@ def internal_error(e):
 ALLOWED_EMAILS_FILE = 'allowed_emails.csv'
 USERS_FILE = 'users.csv'
 
+def read_csv(file_path):
+    if not os.path.exists(file_path):
+        return []
+    with open(file_path, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        return list(reader)
+
+def write_csv(file_path, fieldnames, rows):
+    with open(file_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+@main.route('/admin', methods=['GET', 'POST'])
+def admin():
+    if 'user_email' not in session or session['user_email'] != 'admin@admin.com':
+        flash("Unauthorized access!", "error")
+        return redirect(url_for('main.login'))
+
+    allowed_emails = read_csv(ALLOWED_EMAILS_FILE)  # [{'useremail': '...'}]
+    users = read_csv(USERS_FILE)  # [{'email':..., 'password_hash':..., 'full_name':..., 'registration_date':...}]
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'add_email':
+            new_email = request.form.get('new_email', '').strip().lower()
+            if new_email:
+                if any(row['useremail'].lower() == new_email for row in allowed_emails):
+                    flash(f"{new_email} is already allowed.", "warning")
+                else:
+                    allowed_emails.append({'useremail': new_email})
+                    write_csv(ALLOWED_EMAILS_FILE, ['useremail'], allowed_emails)
+                    flash(f"{new_email} added to allowed emails.", "success")
+            else:
+                flash("Please provide a valid email.", "error")
+
+        elif action == 'update_password':
+            user_email = request.form.get('user_email', '').strip().lower()
+            new_password = request.form.get('new_password', '')
+            if not new_password:
+                flash("Password cannot be empty!", "error")
+            else:
+                updated = False
+                for user in users:
+                    if user['email'].lower() == user_email:
+                        user['password_hash'] = generate_password_hash(new_password)
+                        updated = True
+                        break
+                if updated:
+                    write_csv(USERS_FILE, ['email', 'password_hash', 'full_name', 'registration_date'], users)
+                    flash(f"Password updated for {user_email}", "success")
+                else:
+                    flash(f"User {user_email} not found!", "error")
+
+        return redirect(url_for('main.admin'))
+
+    return render_template('admin.html', users=users, allowed_emails=allowed_emails)
+
 def load_allowed_emails():
     """Load allowed emails from CSV file"""
     allowed_emails = set()
@@ -377,6 +436,8 @@ def login():
         if user and check_password_hash(user['password_hash'], password):
             session['user_email'] = email.lower()
             flash('Login successful!', 'success')
+            if email.lower() == 'admin@admin.com':
+                return redirect(url_for('main.admin'))
             return redirect(url_for('main.home'))
         else:
             flash('Invalid email or password!', 'error')
