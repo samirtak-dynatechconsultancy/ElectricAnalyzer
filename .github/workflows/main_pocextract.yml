@@ -32,6 +32,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
         
+      - name: Uninstall opencvpython
+        run: pip install opencv-python
+      - name: Install headless
+        run: pip install opencv-python-headless==4.12.0.88
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
       - name: Upload artifact for deployment jobs
@@ -59,4 +63,5 @@ jobs:
           app-name: 'pocextract'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_80A7C2DB1A0247BA8BEEBFA6962CAFDF }}
+
 
