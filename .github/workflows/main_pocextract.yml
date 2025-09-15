@@ -42,23 +42,19 @@ jobs:
             .
             !venv/
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    
-    steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: python-app
-      
-      - name: 'Deploy to Azure Web App'
-        uses: azure/webapps-deploy@v3
-        id: deploy-to-webapp
-        with:
-          app-name: 'pocextract'
-          slot-name: 'Production'
+deploy:
+  runs-on: ubuntu-latest
+  needs: build
+  
+  steps:
+    - name: Checkout source code
+      uses: actions/checkout@v4
 
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_80A7C2DB1A0247BA8BEEBFA6962CAFDF }}
-
-
+    - name: 'Deploy to Azure Web App'
+      uses: azure/webapps-deploy@v3
+      id: deploy-to-webapp
+      with:
+        app-name: 'pocextract'
+        slot-name: 'Production'
+        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_80A7C2DB1A0247BA8BEEBFA6962CAFDF }}
+        package: '.'   # send source code instead of pre-built artifact
