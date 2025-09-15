@@ -19,6 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies (libGL and libglib)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libglib2.0-0
+
       - name: Set up Python version
         uses: actions/setup-python@v5
         with:
@@ -60,3 +65,4 @@ jobs:
           slot-name: 'Production'
 
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_80A7C2DB1A0247BA8BEEBFA6962CAFDF }}
+
