@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Electric Circuit Analyzer{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Admin Dashboard</h2>
+
+    <!-- Allowed Emails Section -->
+    <h3>Allowed Emails</h3>
+    <form method="POST" class="form-inline">
+        <input type="hidden" name="action" value="add_email">
+        <input type="email" name="new_email" placeholder="Enter new allowed email" required>
+        <button type="submit" class="btn btn-primary">Add Email</button>
+    </form>
+
+    {% if allowed_emails %}
+    <ul>
+        {% for row in allowed_emails %}
+            <li>{{ row.useremail }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <p>No allowed emails found.</p>
+    {% endif %}
+
+    <!-- Users Section -->
+    <h3>Registered Users</h3>
+    {% if users %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Registration Date</th>
+                    <th>Update Password</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.full_name }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.registration_date }}</td>
+                    <td>
+                        <form method="POST" style="display: flex; gap: 5px;">
+                            <input type="hidden" name="action" value="update_password">
+                            <input type="hidden" name="user_email" value="{{ user.email }}">
+                            <input type="password" name="new_password" placeholder="New password" required>
+                            <button type="submit" class="btn btn-warning">Update</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No users registered yet.</p>
+    {% endif %}
+
+    <div class="text-center">
+        <a href="{{ url_for('main.home') }}" class="btn">Back to Home</a>
+        <a href="{{ url_for('main.logout') }}" class="btn btn-danger">Logout</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Electric Circuit Analyzer{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>User Profile</h2>
+    {% if user %}
+        <div class="form-group">
+            <label>Full Name:</label>
+            <p>{{ user.full_name }}</p>
+        </div>
+        
+        <div class="form-group">
+            <label>Email:</label>
+            <p>{{ user.email }}</p>
+        </div>
+        
+        <div class="form-group">
+            <label>Registration Date:</label>
+            <p>{{ user.registration_date }}</p>
+        </div>
+    {% else %}
+        <p>User information not found.</p>
+    {% endif %}
+    
+    <div class="text-center">
+        <a href="{{ url_for('main.home') }}" class="btn">Back to Home</a>
+        <a href="{{ url_for('main.logout') }}" class="btn btn-danger">Logout</a>
+    </div>
+</div>
+{% endblock %}

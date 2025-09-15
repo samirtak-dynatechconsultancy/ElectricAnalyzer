@@ -12,14 +12,25 @@ import pandas as pd
 import csv
 import string
 import numpy as np
+import os
+from ultralytics import YOLO
 
+# Get the directory where the current script is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Build the absolute path to your model
+MODEL_PATH = os.path.join(BASE_DIR, "models", "best.pt")
+
+# Load the model
+best_model = YOLO(MODEL_PATH)
 JUNCTION_INTERSECTION_THRESHOLD = 15  # Distance threshold for wire-junction intersections
 WIRE_CONNECTION_THRESHOLD = 15        # Distance threshold for wire endpoint connections
 JUNCTION_PARAM_THRESHOLD_START = 0.8 # Parameter threshold for detecting junction at wire start
 JUNCTION_PARAM_THRESHOLD_END = 0.5   # Parameter threshold for detecting junction at wire end
 MIN_LENGTH = 30
 zoom = 4.0
+
+
 def load_voc_boxes(voc_path):
     tree = ET.parse(voc_path)
     root = tree.getroot()
@@ -1471,9 +1482,9 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     Improved combined function with better flow analysis
     wire_connection_threshold: Distance threshold for detecting wire endpoint connections
     """
-    bounding_boxes = []
-    if xml is not None:
-        bounding_boxes = load_voc_boxes(xml)
+    # bounding_boxes = []
+    # if xml is not None:
+    #     bounding_boxes = load_voc_boxes(xml)
     # print(f"Loaded {len(bounding_boxes)} bounding boxes from XML")
     doc = fitz.open(pdf_file)
     fitz_page = doc[page_no - 1]
@@ -1499,6 +1510,32 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         # Default crop parameters
         x, y, w, h = 60, 57, 3249, 2028
         cropped_img = img[y:y+h, x:x+w]
+    
+    # Should be in this format: boxes.append((xmin, ymin, xmax, ymax, name))
+    # bounding_boxes = 
+    confidence = 0.5
+
+    results = best_model.predict(
+        source=cropped_img,
+        conf=confidence,
+        save=False,
+        verbose=False
+    )
+
+    # Extract bounding boxes
+    bounding_boxes = []
+    for result in results:
+        boxes = result.boxes
+        for box in boxes:
+            xyxy = box.xyxy.cpu().numpy()[0]  # [xmin, ymin, xmax, ymax]
+            cls_id = int(box.cls.cpu().numpy()[0])
+            class_name = result.names[cls_id]
+
+            # Cast to native Python float
+            xmin, ymin, xmax, ymax = [int(v) for v in xyxy]
+
+            bounding_boxes.append((xmin, ymin, xmax, ymax, class_name))
+
     # cropped_img = img.copy()
     # print(f"Image cropped to region: x={x}, y={y}, w={w}, h={h}")
 
@@ -1762,6 +1799,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 unique_id = get_unique_component_id(component_name, bbox_coords)
 
                 # Draw rectangle
+                
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
                 # Put text (ID)
