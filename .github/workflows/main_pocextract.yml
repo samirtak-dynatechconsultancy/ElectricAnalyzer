@@ -42,19 +42,20 @@ jobs:
             .
             !venv/
 
-deploy:
-  runs-on: ubuntu-latest
-  needs: build
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
   
-  steps:
-    - name: Checkout source code
-      uses: actions/checkout@v4
-
-    - name: 'Deploy to Azure Web App'
-      uses: azure/webapps-deploy@v3
-      id: deploy-to-webapp
-      with:
-        app-name: 'pocextract'
-        slot-name: 'Production'
-        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_80A7C2DB1A0247BA8BEEBFA6962CAFDF }}
-        package: '.'   # send source code instead of pre-built artifact
+      - name: 'Deploy to Azure Web App'
+        uses: azure/webapps-deploy@v3
+        id: deploy-to-webapp
+        with:
+          app-name: 'pocextract'
+          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_80A7C2DB1A0247BA8BEEBFA6962CAFDF }}
+          package: '.'   # send source code instead of pre-built artifact
+  
