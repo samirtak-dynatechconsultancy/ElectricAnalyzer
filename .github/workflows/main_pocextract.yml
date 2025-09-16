@@ -58,4 +58,4 @@ jobs:
         with:
           app-name: 'pocextract'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_447888AEC18647E2B478BFA941623A94 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_964DC88B63E043B2A3300BB3617DC5A2 }}
