@@ -1,1 +1,0 @@
-apt-get install -y libgl1 libsm6 libxrender1 libxext6

@@ -12,46 +12,33 @@
                         📄 Choose PDF File
                     </label>
                 </div>
-                <!-- <div id="xml-files-container"></div>
-
-                <button type="button" id="add-xml-btn" class="add-xml-btn">
-                    ➕ Add XML File
-                </button> -->
-
-                <!-- <div class="file-input-wrapper">
-                    <input type="file" name="xml_file" id="xml-file" accept="application/xml">
-                    <label for="xml-file" class="file-input-label">
-                        📄 Choose XML File
-                    </label>
-                </div> -->
 
                 <input type="text" name="page_num" id="selected-pages" placeholder="Page Number" style="display: none;">
 
-                <button type="submit" class="submit-btn" id="submit-btn">
+                <!-- Analysis button - initially hidden -->
+                <button type="submit" class="submit-btn" id="submit-btn" style="display: none;">
                     📤 Upload & Analyze
                 </button>
             </form>
+
+            <!-- Page Selection button - initially hidden -->
+            <!-- <button type="button" class="page-select-btn" id="page-select-btn" style="display: none;" onclick="enablePageSelection()">
+                📑 Select Pages
+            </button> -->
 
             <div id="upload-status"></div>
 
             <!-- File selection status -->
             <div id="file-status" class="file-status">
                 <div id="pdf-file-status">PDF: Not selected</div>
-                <!-- <div id="xml-file-status">XML: Not selected</div> -->
             </div>
-
-            <!-- Debug information -->
-            <!-- <div class="debug-info" id="debug-info" style="display: none;">
-                <strong>Debug Info:</strong>
-                <div id="debug-content"></div>
-            </div> -->
         </div>
 
         <div class="tabs">
             <button class="tab" id="pdf-preview-tab" onclick="showTab('pdf-preview')" style="display: none;">📄 PDF
                 Preview</button>
-            <button class="tab active" onclick="showTab('dataframes')">📊 Data Tables</button>
-            <button class="tab" onclick="showTab('analysis-images')">🖼️ Analysis Images</button>
+            <button class="tab active" onclick="showTab('selected-pdf-pages')">📄 Selected Pages</button>
+            <button class="tab" onclick="showTab('dataframes')">📊 Data Tables</button>
             <button class="tab" onclick="showTab('drawn-lines')">📝 Drawn Lines</button>
         </div>
 
@@ -82,9 +69,6 @@
 
                 <div class="selection-controls" id="selection-controls">
                     <div class="selection-row">
-                        <!-- <label class="selection-label" for="selected-pages">Selected Pages:</label>
-                        <input type="text" id="selected-pages"
-                            placeholder="Enter page numbers separated by commas (e.g., 1, 3, 5-7, 10)" readonly> -->
                         <button class="clear-selection-btn" onclick="clearSelection()">
                             🗑️ Clear
                         </button>
@@ -100,22 +84,59 @@
             </div>
         </div>
 
-        <div id="dataframes" class="tab-content active">
-            <div class="table-container">
-                <div class="table-header">
-                    <div class="table-title">Wire Analysis Data</div>
-                    <button class="download-btn" onclick="downloadCSV('wire-data')">
-                        📥 Download CSV
+        <div id="selected-pdf-pages" class="tab-content active">
+            <div class="pdf-container">
+                <div class="pdf-header">
+                    <div class="pdf-title">📄 Selected Pages</div>
+                    <div class="pdf-info">
+                        <span id="selected-pdf-name">No pages selected</span>
+                        <span id="selected-pages-info" style="display: none;">•</span>
+                        <span id="selected-pages-display" style="display: none;">Pages: <span id="selected-pages-list">None</span></span>
+                    </div>
+                </div>
+
+                <div class="pdf-controls" id="selected-pdf-controls" style="display: none;">
+                    <button class="page-btn" id="selected-pdf-prev-btn" onclick="changeSelectedPdfPage(-1)">
+                        ← Previous
+                    </button>
+                    <span class="current-page">Page <span id="current-selected-page">1</span> of <span id="total-selected-pages">0</span></span>
+                    <button class="page-btn" id="selected-pdf-next-btn" onclick="changeSelectedPdfPage(1)">
+                        Next →
+                    </button>
+                    <button class="page-btn component-btn" id="draw-components-btn" onclick="drawComponents()">
+                        🎨 Draw Components
                     </button>
                 </div>
-                <div class="table-wrapper">
-                    <table id="wire-table">
-                        <thead id="wire-thead"></thead>
-                        <tbody id="wire-tbody"></tbody>
-                    </table>
+
+                <!-- Component Drawing Controls -->
+                <div class="component-controls" id="component-controls" style="display: none;">
+                    <div class="component-row">
+                        <label>Width: <input type="number" id="componentWidth" value="20" min="10" max="200"></label>
+                        <label>Height: <input type="number" id="componentHeight" value="20" min="10" max="200"></label>
+                        <button class="page-btn" id="exit-component-mode" onclick="exitComponentMode()">
+                            ✗ Exit Drawing Mode
+                        </button>
+                        <button class="download-btn" onclick="downloadModifiedPDF()">
+                            📥 Download Modified PDF
+                        </button>
+                    </div>
+                    <div class="coordinates-display" id="coordinates-display" style="display: none;">
+                        Click coordinates will appear here
+                    </div>
+                </div>
+
+                <div class="pdf-display" id="selected-pdf-display">
+                    <div class="no-selection-message">
+                        <p>No pages selected yet.</p>
+                        <p>Click "Select Pages" above to choose pages from your PDF.</p>
+                    </div>
+                    <canvas id="selected-pdf-canvas" style="display: none;"></canvas>
+                    <div id="component-overlay" style="position: absolute; top: 0; left: 0; pointer-events: none;"></div>
                 </div>
             </div>
+        </div>
 
+        <div id="dataframes" class="tab-content">
             <div class="table-container">
                 <div class="table-header">
                     <div class="table-title">Connection Analysis Data</div>
@@ -193,6 +214,108 @@
             </div>
         </div>
     </div>
+
+    <style>
+        .page-select-btn {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .page-select-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .no-selection-message {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .no-selection-message p {
+            margin: 10px 0;
+        }
+
+        .component-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white !important;
+        }
+
+        .component-btn:hover {
+            background: linear-gradient(135deg, #ee5a24, #ff6b6b);
+        }
+
+        .component-controls {
+            background: #f8f9fa;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .component-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .component-row label {
+            font-weight: 600;
+        }
+
+        .component-row input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            margin-left: 5px;
+        }
+
+        .coordinates-display {
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+
+        .pdf-display canvas {
+            transition: cursor 0.2s ease;
+        }
+
+        .pdf-display canvas.drawing-mode {
+            cursor: crosshair !important;
+        }
+
+        .pdf-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        #component-overlay .component-box {
+            transition: all 0.2s ease-in-out;
+        }
+
+    </style>
+
     <script>
         // PDF.js setup
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -201,223 +324,175 @@
         let currentPdfPage = 1;
         let totalPdfPages = 1;
         let isSelectionMode = false;
+        let isComponentDrawMode = false;
         const imagesPerPage = 20;
         let selectedPages = new Set();
+        let selectedPagesArray = []; // Array version for navigation
+        let currentSelectedPageIndex = 0;
         let sampleData = {};
         let currentPage = 1;
         let totalImages = 0;
+        let pdfFileName = '';
+        let originalPageWidth = 0;
+        let originalPageHeight = 0;
+        let scaleX = 1;
+        let scaleY = 1;
+        const pageComponents = {}; // { pageNum: [ {x, y, width, height} ] }
 
-        // Debug function
-        // function debugLog(message, data = null) {
-        //     console.log(`[DEBUG] ${message}`, data || '');
-        //     const debugInfo = document.getElementById('debug-info');
-        //     const debugContent = document.getElementById('debug-content');
 
-        //     debugInfo.style.display = 'block';
-        //     debugContent.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
-
-        //     if (data) {
-        //         debugContent.innerHTML += `<pre style="font-size: 0.8rem; margin: 5px 0;">${JSON.stringify(data, null, 2)}</pre>`;
-        //     }
-        // }
-
+        
         // File input handlers with proper event binding
         document.addEventListener('DOMContentLoaded', function () {
-            // debugLog('DOM Content Loaded');
-
             // PDF file input handler
             const pdfInput = document.getElementById('pdf-file');
             const pdfLabel = document.querySelector('label[for="pdf-file"]');
             const pdfStatus = document.getElementById('pdf-file-status');
 
             if (pdfInput && pdfLabel) {
-                // debugLog('PDF input and label found');
-
                 // Handle file selection
                 pdfInput.addEventListener('change', function (e) {
-                    // debugLog('PDF file input changed', { filesLength: e.target.files.length });
-
                     const file = e.target.files[0];
                     if (file) {
-                        // debugLog('PDF file selected', { name: file.name, type: file.type, size: file.size });
-
                         if (file.type === 'application/pdf') {
                             pdfStatus.textContent = `PDF: ${file.name}`;
+                            pdfFileName = file.name;
                             pdfStatus.classList.add('file-selected');
 
                             // Load PDF for preview
                             loadPDF(file);
                             document.getElementById('pdf-name').textContent = file.name;
+                            document.getElementById('selected-pdf-name').textContent = file.name;
 
-                            // Show PDF preview tab
-                            const pdfTab = document.getElementById('pdf-preview-tab');
-                            if (pdfTab) {
-                                pdfTab.style.display = 'flex';
-                                // debugLog('PDF preview tab shown');
-                            }
+                            // Show page selection button
+                            document.getElementById('page-select-btn').style.display = 'inline-block';
+
+                            // Hide analysis button until pages are selected
+                            document.getElementById('submit-btn').style.display = 'none';
 
                             // Reset selection state
                             isSelectionMode = false;
                             selectedPages.clear();
+                            selectedPagesArray = [];
                             updateSelectionUI();
+                            updateSelectedPagesDisplay();
                         } else {
                             pdfStatus.textContent = 'PDF: Invalid file type';
                             pdfStatus.classList.remove('file-selected');
-                            // debugLog('Invalid PDF file type', { type: file.type });
                         }
                     } else {
                         pdfStatus.textContent = 'PDF: Not selected';
                         pdfStatus.classList.remove('file-selected');
-                        // debugLog('No PDF file selected');
+                        document.getElementById('page-select-btn').style.display = 'none';
+                        document.getElementById('submit-btn').style.display = 'none';
                     }
                 });
 
                 // Handle label click
                 pdfLabel.addEventListener('click', function (e) {
                     e.preventDefault();
-                    // debugLog('PDF label clicked');
                     pdfInput.click();
                 });
-            } else {
-                // debugLog('PDF input or label not found', {
-                    // pdfInput: !!pdfInput,
-                    // pdfLabel: !!pdfLabel
-                // });
             }
-            const xmlFilesContainer = document.getElementById('xml-files-container');
-            const addXmlBtn = document.getElementById('add-xml-btn');
-
-            let xmlCounter = 0;
-
-            addXmlBtn.addEventListener('click', () => {
-                xmlCounter++;
-                const wrapper = document.createElement('div');
-                wrapper.className = "xml-upload-wrapper";
-                wrapper.innerHTML = `
-                    <div class="xml-card">
-                        <div class="file-input-wrapper">
-                            <input type="file" name="xml_file_${xmlCounter}" id="xml-file-${xmlCounter}" accept="application/xml">
-                            <label for="xml-file-${xmlCounter}" class="file-input-label">
-                                📄 Choose XML File
-                            </label>
-                            <span id="xml-status-${xmlCounter}" class="file-status">XML: Not selected</span>
-                        </div>
-
-                        <div class="page-input-wrapper">
-                            <label for="xml-page-${xmlCounter}" class="page-label">📑 Page Number:</label>
-                            <input type="text" name="xml_page_${xmlCounter}" id="xml-page-${xmlCounter}" placeholder="e.g. 5">
-                        </div>
-
-                        <button type="button" class="remove-xml-btn">❌ Remove</button>
-                    </div>
-                `;
-
-                // Add file status update
-                const xmlInput = wrapper.querySelector(`#xml-file-${xmlCounter}`);
-                const xmlStatus = wrapper.querySelector(`#xml-status-${xmlCounter}`);
-
-                xmlInput.addEventListener('change', (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        xmlStatus.textContent = `XML: ${file.name}`;
-                        xmlStatus.classList.add('file-selected');
-                    } else {
-                        xmlStatus.textContent = "XML: Not selected";
-                        xmlStatus.classList.remove('file-selected');
-                    }
-                });
-
-                // Add remove button logic
-                wrapper.querySelector('.remove-xml-btn').addEventListener('click', () => {
-                    wrapper.remove();
-                });
-
-                xmlFilesContainer.appendChild(wrapper);
-            });
-
-            // XML file input handler
-            // const xmlInput = document.getElementById('xml-file');
-            // const xmlLabel = document.querySelector('label[for="xml-file"]');
-            // const xmlStatus = document.getElementById('xml-file-status');
-
-            // if (xmlInput && xmlLabel) {
-            //     // debugLog('XML input and label found');
-
-            //     xmlInput.addEventListener('change', function (e) {
-            //         // debugLog('XML file input changed', { filesLength: e.target.files.length });
-
-            //         const file = e.target.files[0];
-            //         if (file) {
-            //             // // debugLog('XML file selected', { name: file.name, type: file.type, size: file.size });
-            //             xmlStatus.textContent = `XML: ${file.name}`;
-            //             xmlStatus.classList.add('file-selected');
-            //         } else {
-            //             xmlStatus.textContent = 'XML: Not selected';
-            //             xmlStatus.classList.remove('file-selected');
-            //             // debugLog('No XML file selected');
-            //         }
-            //     });
-
-            //     xmlLabel.addEventListener('click', function (e) {
-            //         e.preventDefault();
-            //         // debugLog('XML label clicked');
-            //         xmlInput.click();
-            //     });
-            // }
         });
 
+        function enablePageSelection() {
+            // Show PDF preview tab and switch to it
+            const pdfTab = document.getElementById('pdf-preview-tab');
+            pdfTab.style.display = 'flex';
+            showTab('pdf-preview');
+            
+            // Enable selection mode
+            isSelectionMode = true;
+            updateSelectionUI();
+            
+            // Add click handler to canvas for page selection
+            document.getElementById('pdf-canvas').addEventListener('click', handlePageSelection);
+        }
+
         function loadPDF(file) {
-            // debugLog('Loading PDF', { fileName: file.name });
             const fileReader = new FileReader();
 
             fileReader.onload = function () {
-                // debugLog('PDF FileReader loaded');
                 const typedarray = new Uint8Array(this.result);
 
                 pdfjsLib.getDocument(typedarray).promise.then(function (pdf) {
-                    // debugLog('PDF document loaded', { numPages: pdf.numPages });
                     pdfDoc = pdf;
                     totalPdfPages = pdf.numPages;
                     document.getElementById('total-pdf-pages').textContent = totalPdfPages;
                     document.getElementById('pdf-page-input').max = totalPdfPages;
-                    document.getElementById('selected-pages').value = '1 - ' + totalPdfPages;
-                    document.getElementById('selected-pages').style.removeProperty('display');
-                    showTab('pdf-preview')
+                    
                     currentPdfPage = 1;
                     renderPdfPage(currentPdfPage);
+                    enablePageSelection();
+
+                    const pdfFileInput = document.getElementById('pdf-file');
+                    if (!pdfFileInput.files.length) {
+                        alert('No PDF file available');
+                        return;
+                    }
+
+                    // First upload the PDF file to the backend (similar to the white box editor)
+                    const formData = new FormData();
+                    formData.append('pdf_file', pdfFileInput.files[0]);
+                    console.log(formData);
+                    fetch('/optimize', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('PDF uploaded successfully:', data);
+                        } else {
+                            console.error('Error uploading PDF:', data.error);
+                        }
+                    })
+                    .catch(function (error) {
+                        console.error('Error uploading PDF:', error);
+                    });
                 }).catch(function (error) {
-                    // debugLog('Error loading PDF document', error);
+                    console.error('Error loading PDF document', error);
                 });
             };
 
             fileReader.onerror = function () {
-                // debugLog('FileReader error', fileReader.error);
+                console.error('FileReader error', fileReader.error);
             };
 
             fileReader.readAsArrayBuffer(file);
         }
 
-        function renderPdfPage(pageNumber) {
+        function renderPdfPage(pageNumber, canvasId = 'pdf-canvas') {
             if (!pdfDoc) {
-                // debugLog('No PDF document to render');
                 return;
             }
 
-            // debugLog('Rendering PDF page', { pageNumber });
-
             pdfDoc.getPage(pageNumber).then(function (page) {
-                const canvas = document.getElementById('pdf-canvas');
+                const canvas = document.getElementById(canvasId);
                 const context = canvas.getContext('2d');
 
                 // Calculate scale based on container width
-                const container = document.querySelector('.pdf-display');
+                const container = canvas.parentElement;
                 const containerWidth = container.clientWidth - 60; // Account for padding
                 const viewport = page.getViewport({ scale: 1 });
+                
+                // Store original page dimensions
+                if (canvasId === 'selected-pdf-canvas') {
+                    originalPageWidth = viewport.width;
+                    originalPageHeight = viewport.height;
+                }
+                
                 const scale = Math.min(containerWidth / viewport.width, 1.5);
                 const scaledViewport = page.getViewport({ scale: scale });
 
                 canvas.height = scaledViewport.height;
                 canvas.width = scaledViewport.width;
+
+                // Calculate scale factors for coordinate conversion
+                if (canvasId === 'selected-pdf-canvas') {
+                    scaleX = canvas.width / originalPageWidth;
+                    scaleY = canvas.height / originalPageHeight;
+                }
 
                 const renderContext = {
                     canvasContext: context,
@@ -425,35 +500,45 @@
                 };
 
                 page.render(renderContext).promise.then(function () {
-                    // debugLog('PDF page rendered successfully');
-                    document.getElementById('current-pdf-page').textContent = pageNumber;
-                    document.getElementById('pdf-page-input').value = pageNumber;
+                    if (canvasId === 'pdf-canvas') {
+                        document.getElementById('current-pdf-page').textContent = pageNumber;
+                        document.getElementById('pdf-page-input').value = pageNumber;
 
-                    // Update navigation buttons
-                    document.getElementById('pdf-prev-btn').disabled = pageNumber <= 1;
-                    document.getElementById('pdf-next-btn').disabled = pageNumber >= totalPdfPages;
+                        // Update navigation buttons
+                        document.getElementById('pdf-prev-btn').disabled = pageNumber <= 1;
+                        document.getElementById('pdf-next-btn').disabled = pageNumber >= totalPdfPages;
 
-                    // Update selection indicator
-                    updateSelectionIndicator();
-                    attachScrollListener();
-
+                        // Update selection indicator
+                        updateSelectionIndicator();
+                        attachScrollListener();
+                    }
                 }).catch(function (error) {
-                    // debugLog('Error rendering PDF page', error);
+                    console.error('Error rendering PDF page', error);
                 });
             }).catch(function (error) {
-                // debugLog('Error getting PDF page', error);
+                console.error('Error getting PDF page', error);
             });
+
+            function renderComponentOverlays(pageNum) {
+                const overlay = document.getElementById('component-overlay');
+                overlay.innerHTML = ''; // Clear old boxes
+
+                if (!pageComponents[pageNum]) return;
+
+                pageComponents[pageNum].forEach(c => {
+                    drawComponentOverlay(c.x, c.y, c.width, c.height);
+                });
+            }
+            renderComponentOverlays(selectedPagesArray[currentSelectedPageIndex]);
+
         }
 
         function attachScrollListener() {
             const pdfCanvas = document.getElementById("pdf-canvas");
-            const pdfDisplay = document.getElementById("pdf-display");
 
-            [pdfCanvas, pdfDisplay].forEach(el => {
-                if (!el || el.dataset.wheelBound) return; // avoid duplicate bindings
-                el.addEventListener("wheel", handlePdfScroll, { passive: false });
-                el.dataset.wheelBound = "true"; // mark as bound
-            });
+            if (!pdfCanvas || pdfCanvas.dataset.wheelBound) return; // avoid duplicate bindings
+            pdfCanvas.addEventListener("wheel", handlePdfScroll, { passive: false });
+            pdfCanvas.dataset.wheelBound = "true"; // mark as bound
         }
 
         function handlePdfScroll(e) {
@@ -508,6 +593,15 @@
 
             updateSelectedPagesInput();
             updateSelectionIndicator();
+            updateSelectedPagesDisplay();
+            
+            // Show/hide analyze button based on selection
+            const submitBtn = document.getElementById('submit-btn');
+            if (selectedPages.size > 0) {
+                submitBtn.style.display = 'inline-block';
+            } else {
+                submitBtn.style.display = 'none';
+            }
         }
 
         function updateSelectionUI() {
@@ -528,6 +622,7 @@
         function updateSelectedPagesInput() {
             const input = document.getElementById('selected-pages');
             const sortedPages = Array.from(selectedPages).sort((a, b) => a - b);
+            selectedPagesArray = sortedPages; // Update array for navigation
 
             if (sortedPages.length === 0) {
                 input.value = '';
@@ -570,16 +665,288 @@
             }
         }
 
+        function updateSelectedPagesDisplay() {
+            const selectedPdfName = document.getElementById('selected-pdf-name');
+            const selectedPagesInfo = document.getElementById('selected-pages-info');
+            const selectedPagesDisplay = document.getElementById('selected-pages-display');
+            const selectedPagesList = document.getElementById('selected-pages-list');
+            const selectedPdfControls = document.getElementById('selected-pdf-controls');
+            const selectedPdfCanvas = document.getElementById('selected-pdf-canvas');
+            const noSelectionMessage = document.querySelector('.no-selection-message');
+
+            if (selectedPages.size === 0) {
+                selectedPagesInfo.style.display = 'none';
+                selectedPagesDisplay.style.display = 'none';
+                selectedPdfControls.style.display = 'none';
+                selectedPdfCanvas.style.display = 'none';
+                noSelectionMessage.style.display = 'block';
+                selectedPdfName.textContent = 'No pages selected';
+            } else {
+                selectedPagesInfo.style.display = 'inline';
+                selectedPagesDisplay.style.display = 'inline';
+                selectedPdfControls.style.display = 'flex';
+                selectedPdfCanvas.style.display = 'block';
+                noSelectionMessage.style.display = 'none';
+                selectedPdfName.textContent = pdfFileName;
+                
+                // Update selected pages list display
+                const sortedPages = Array.from(selectedPages).sort((a, b) => a - b);
+                selectedPagesList.textContent = sortedPages.join(', ');
+                
+                // Update total selected pages
+                document.getElementById('total-selected-pages').textContent = selectedPages.size;
+                
+                // Show first selected page
+                if (selectedPagesArray.length > 0) {
+                    currentSelectedPageIndex = 0;
+                    renderPdfPage(selectedPagesArray[currentSelectedPageIndex], 'selected-pdf-canvas');
+                    updateSelectedPageNavigation();
+                }
+            }
+        }
+
+        function changeSelectedPdfPage(delta) {
+            const newIndex = currentSelectedPageIndex + delta;
+            if (newIndex >= 0 && newIndex < selectedPagesArray.length) {
+                currentSelectedPageIndex = newIndex;
+                renderPdfPage(selectedPagesArray[currentSelectedPageIndex], 'selected-pdf-canvas');
+                updateSelectedPageNavigation();
+            }
+        }
+
+        function updateSelectedPageNavigation() {
+            document.getElementById('current-selected-page').textContent = currentSelectedPageIndex + 1;
+            document.getElementById('selected-pdf-prev-btn').disabled = currentSelectedPageIndex === 0;
+            document.getElementById('selected-pdf-next-btn').disabled = currentSelectedPageIndex === selectedPagesArray.length - 1;
+        }
+
+        function drawComponents() {
+            // Enable component drawing mode
+            isComponentDrawMode = true;
+            updateComponentDrawUI();
+            
+            // Show component controls
+            document.getElementById('component-controls').style.display = 'block';
+            
+            // Add drawing mode class to canvas
+            const canvas = document.getElementById('selected-pdf-canvas');
+            if (canvas) {
+                canvas.classList.add('drawing-mode');
+                canvas.addEventListener('click', handleComponentPlacement);
+                canvas.addEventListener('mousemove', showCoordinates);
+            }
+        }
+
+        function updateComponentDrawUI() {
+            const drawBtn = document.getElementById('draw-components-btn');
+            if (isComponentDrawMode) {
+                drawBtn.textContent = '🎨 Drawing Mode Active';
+                drawBtn.disabled = true;
+            } else {
+                drawBtn.textContent = '🎨 Draw Components';
+                drawBtn.disabled = false;
+            }
+        }
+
+        function exitComponentMode() {
+            isComponentDrawMode = false;
+            updateComponentDrawUI();
+            
+            // Hide component controls
+            document.getElementById('component-controls').style.display = 'none';
+            
+            // Remove drawing mode from canvas
+            const canvas = document.getElementById('selected-pdf-canvas');
+            if (canvas) {
+                canvas.classList.remove('drawing-mode');
+                canvas.removeEventListener('click', handleComponentPlacement);
+                canvas.removeEventListener('mousemove', showCoordinates);
+            }
+            
+            // Hide coordinates display
+            document.getElementById('coordinates-display').style.display = 'none';
+        }
+
+        function handleComponentPlacement(event) {
+            if (!isComponentDrawMode) return;
+
+            const canvas = event.currentTarget;
+            const canvasRect = canvas.getBoundingClientRect();
+
+            // Calculate coordinates relative to the canvas
+            const canvasX = event.clientX - canvasRect.left;
+            const canvasY = event.clientY - canvasRect.top;
+
+            // Convert to PDF coordinates
+            const pdfX = canvasX / scaleX;
+            const pdfY = canvasY / scaleY;
+
+            const width = parseInt(document.getElementById('componentWidth').value);
+            const height = parseInt(document.getElementById('componentHeight').value);
+            const currentPagePdf = selectedPagesArray[currentSelectedPageIndex];
+
+            // Save this component to the pageComponents object
+            if (!pageComponents[currentPagePdf]) pageComponents[currentPagePdf] = [];
+            pageComponents[currentPagePdf].push({ x: pdfX, y: pdfY, width, height });
+
+            // Draw immediately for UI feedback
+            drawComponentOverlay(pdfX, pdfY, width, height);
+
+            // Show coordinates
+            const coordsDisplay = document.getElementById('coordinates-display');
+            coordsDisplay.textContent = `Adding component at: X=${pdfX.toFixed(1)}, Y=${pdfY.toFixed(1)} on page ${currentPagePdf}`;
+            coordsDisplay.style.display = 'block';
+
+            // Call backend to save to PDF
+            addWhiteBoxToPDF(currentPagePdf - 1, pdfX, pdfY, width, height);
+        }
+        function showCoordinates(event) {
+            if (!isComponentDrawMode) return;
+
+            const canvas = event.currentTarget;
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            // Calculate coordinates relative to the canvas
+            const canvasX = event.clientX - canvasRect.left;
+            const canvasY = event.clientY - canvasRect.top;
+            
+            // Convert to PDF coordinates
+            const pdfX = canvasX / scaleX;
+            const pdfY = canvasY / scaleY;
+
+            const coordsDisplay = document.getElementById('coordinates-display');
+            coordsDisplay.textContent = `Mouse at: X=${pdfX.toFixed(1)}, Y=${pdfY.toFixed(1)}`;
+            coordsDisplay.style.display = 'block';
+        }
+
+        function drawComponentOverlay(x, y, width, height) {
+            const canvas = document.getElementById('selected-pdf-canvas');
+            const overlay = document.getElementById('component-overlay');
+            
+            if (!canvas || !overlay) return;
+
+            // Convert PDF coords back to canvas coords
+            const canvasW = width * scaleX;
+            const canvasH = height * scaleY;
+            const canvasX = x * scaleX + canvasW / 2;  // shift left by half width
+            const canvasY = y * scaleY + canvasH / 2;  // shift up by half height
+
+            const box = document.createElement('div');
+            box.classList.add('component-box');
+            box.style.position = 'absolute';
+            box.style.left = `${canvasX}px`;
+            box.style.top = `${canvasY}px`;
+            box.style.width = `${canvasW}px`;
+            box.style.height = `${canvasH}px`;
+            box.style.border = '2px solid red';
+            box.style.background = 'rgba(255, 0, 0, 0.1)';
+            box.style.borderRadius = '4px';
+
+            overlay.appendChild(box);
+        }
+
+        function addWhiteBoxToPDF(pageNum, x, y, width, height) {
+            // Create FormData to upload current PDF if needed
+            const pdfFileInput = document.getElementById('pdf-file');
+            if (!pdfFileInput.files.length) {
+                alert('No PDF file available');
+                return;
+            }
+
+            // First upload the PDF file to the backend (similar to the white box editor)
+            const formData = new FormData();
+            formData.append('file', pdfFileInput.files[0]);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Now add the white box
+                    return fetch('/add_white_box', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            filename: data.filename,
+                            page_num: pageNum,
+                            x: x,
+                            y: y,
+                            width: width,
+                            height: height
+                        })
+                    });
+                } else {
+                    throw new Error(data.error);
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Draw the box visually on the current canvas
+                    drawComponentOverlay(x, y, width, height);
+
+                    // Refresh the PDF if you want (optional)
+                    renderPdfPage(selectedPagesArray[currentSelectedPageIndex], 'selected-pdf-canvas');
+                } else {
+                    alert('Error adding component: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error adding component:', error);
+                alert('Error adding component: ' + error.message);
+            });
+        }
+
+        function downloadModifiedPDF() {
+            const pdfFileInput = document.getElementById('pdf-file');
+            if (!pdfFileInput.files.length) {
+                alert('No PDF file available for download');
+                return;
+            }
+
+            // Create a temporary filename based on the original
+            const originalName = pdfFileInput.files[0].name;
+            const modifiedName = `modified_${originalName}`;
+            
+            // This would need to be implemented in the backend
+            fetch(`/download_modified/${originalName}`)
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('Download failed');
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = modifiedName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                console.error('Download error:', error);
+                alert('Error downloading modified PDF: ' + error.message);
+            });
+        }
+
         function clearSelection() {
             selectedPages.clear();
+            selectedPagesArray = [];
             updateSelectedPagesInput();
             updateSelectionIndicator();
+            updateSelectedPagesDisplay();
+            document.getElementById('submit-btn').style.display = 'none';
         }
 
         // Tab switching function
         function showTab(tabName) {
-            // debugLog('Switching to tab', { tabName });
-
             // Hide all tab contents
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
@@ -608,7 +975,6 @@
         // Form submission handler
         document.getElementById('upload-form').addEventListener('submit', function (event) {
             event.preventDefault();
-            // debugLog('Form submitted');
 
             const pdfFileInput = document.getElementById('pdf-file');
             const pageNumInput = document.getElementById('selected-pages');
@@ -618,32 +984,19 @@
             if (!pdfFileInput.files.length) {
                 statusDiv.textContent = "❌ Please select a PDF file";
                 statusDiv.className = "status-error";
-                // debugLog('No PDF file selected');
                 return;
             }
 
             if (!pageNumInput.value) {
-                statusDiv.textContent = "❌ Please enter a page number";
+                statusDiv.textContent = "❌ Please select pages first";
                 statusDiv.className = "status-error";
-                // debugLog('No page number entered');
                 return;
             }
 
             const formData = new FormData();
             formData.append('pdf_file', pdfFileInput.files[0]);
-
             formData.append('page_num', pageNumInput.value);
             formData.append('enable_network_colors', 'true');
-
-            document.querySelectorAll('.xml-upload-wrapper').forEach((wrapper, idx) => {
-                const fileInput = wrapper.querySelector('input[type="file"]');
-                const pageInput = wrapper.querySelector('input[type="text"]');
-
-                if (fileInput.files.length > 0 && pageInput.value) {
-                    formData.append(`xml_files[${idx}]`, fileInput.files[0]);
-                    formData.append(`xml_pages[${idx}]`, pageInput.value);
-                }
-            });
 
             // Disable submit button and show loading
             submitBtn.disabled = true;
@@ -651,19 +1004,15 @@
             statusDiv.textContent = "⏳ Uploading and analyzing...";
             statusDiv.className = "status-info";
 
-            // debugLog('Sending form data to /analyze');
-
             // Note: This will fail in the demo as there's no backend
             fetch('/analyze', {
                 method: 'POST',
                 body: formData
             })
                 .then(res => {
-                    // debugLog('Response received', { status: res.status, statusText: res.statusText });
                     return res.json();
                 })
                 .then(data => {
-                    // debugLog('Analysis data received', data);
                     if (!data.success) {
                         throw new Error(data.error || "Analysis failed");
                     }
@@ -676,22 +1025,16 @@
                         wireData: data.result.wire_data || [],
                         connectionData: data.result.connection_data || [],
                         images: data.result.images || [],
-                        // combinedCanvas: data.result.images || [],
-                        // junctionPoints: data.result.images.junction_points || "",
-                        // lineCanvas: data.result.images.line_canvas || "",
                         drawnLines: data.result.drawn_lines || []
                     };
                     initializePage();
 
-                    // You would populate your tables and images here
-                    // populateResults(data.result);
-
                 })
-                // .catch(err => {
-                //     debugLog('Error during analysis', err);
-                //     statusDiv.textContent = "❌ " + (err.message || "Network error - no backend available in demo");
-                //     statusDiv.className = "status-error";
-                // })
+                .catch(err => {
+                    console.error('Error during analysis', err);
+                    statusDiv.textContent = "❌ " + (err.message || "Network error - no backend available in demo");
+                    statusDiv.className = "status-error";
+                })
                 .finally(() => {
                     // Re-enable submit button
                     submitBtn.disabled = false;
@@ -699,182 +1042,124 @@
                 });
         });
 
-        function populateWireTable(data) {
-            const thead = document.getElementById('wire-thead');
-            const tbody = document.getElementById('wire-tbody');
+
+        function populateConnectionTable(data) {
+            console.log('Populating connection table with data:', data);
+            const columnOrder = [
+                "source_component",
+                "source_terminal",
+                "dest_component",
+                "dest_terminal",
+                "wire_no",
+                "page_number",
+                "reason",
+                "pdf_name" // keep it in the object, just don't display it
+            ];
+            if (data == undefined || data.length === 0) return;
+
+            data = data.map(row => {
+                const reorderedRow = {};
+                columnOrder.forEach(col => {
+                    if (row.hasOwnProperty(col)) {
+                        reorderedRow[col] = row[col];
+                    }
+                });
+                // Add defaults
+                reorderedRow.selected = "";
+                reorderedRow.reason = reorderedRow.reason || ""; // default empty
+                return reorderedRow;
+            });
+
+            const thead = document.getElementById('connection-thead');
+            const tbody = document.getElementById('connection-tbody');
             thead.innerHTML = "";
             tbody.innerHTML = "";
 
-            if (data == undefined ||data.length === 0) return;
-
-            // Create header
+            // ✅ Create header (skip pdf_name and selected)
             const headerRow = document.createElement('tr');
             Object.keys(data[0]).forEach(key => {
-                const th = document.createElement('th');
-                th.textContent = key.replace('_', ' ').toUpperCase();
-                headerRow.appendChild(th);
+                if (key !== "selected" && key !== "pdf_name") { 
+                    const th = document.createElement('th');
+                    th.textContent = key.replace('_', ' ').toUpperCase();
+                    headerRow.appendChild(th);
+                }
             });
+            headerRow.appendChild(document.createElement('th')); // for action buttons
             thead.appendChild(headerRow);
 
-            // Create rows
-            data.forEach(row => {
+            // ✅ Create rows (skip pdf_name and selected when rendering)
+            data.forEach((row, rowIndex) => {
                 const tr = document.createElement('tr');
-                Object.values(row).forEach(value => {
-                    const td = document.createElement('td');
-                    td.textContent = value;
-                    tr.appendChild(td);
+                Object.entries(row).forEach(([key, value]) => {
+                    if (key !== "selected" && key !== "pdf_name") {
+                        const td = document.createElement('td');
+
+                        if (key === "reason") {
+                            const input = document.createElement('input');
+                            input.type = "text";
+                            input.value = value;
+                            input.placeholder = "Enter reason";
+                            input.addEventListener('input', (e) => {
+                                data[rowIndex].reason = e.target.value;
+                            });
+                            input.addEventListener('click', (e) => e.stopPropagation());
+                            td.appendChild(input);
+                        } else {
+                            td.textContent = value;
+                        }
+
+                        tr.appendChild(td);
+                    }
                 });
+
+                // ✅ Use pdf_name internally but don't display it
+                tr.addEventListener('click', () => {
+                    const wireNo = row["wire_no"];
+                    const pageNum = row["page_number"];
+                    const fileName = row["pdf_name"] || pdfFileName;
+                    const imageName = `/results/${fileName}_p${pageNum}_Wire_${wireNo}.png`;
+                    const imgIndex = currentDisplayedImages.findIndex(img => img.image_url === imageName);
+
+                    if (imgIndex !== -1) {
+                        openOverlay(imgIndex, currentDisplayedImages[imgIndex]);
+                    } else {
+                        console.warn(`No image found for ${imageName} in currentDisplayedImages`);
+                    }
+                });
+
+                // Action buttons
+                const actionTd = document.createElement('td');
+
+                const rightBtn = document.createElement('button');
+                rightBtn.textContent = "Right";
+                rightBtn.className = "btn-right";
+                rightBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    tr.classList.remove('row-wrong');
+                    tr.classList.add('row-right');
+                    data[rowIndex].selected = "True";
+                });
+
+                const wrongBtn = document.createElement('button');
+                wrongBtn.textContent = "Wrong";
+                wrongBtn.className = "btn-wrong";
+                wrongBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    tr.classList.remove('row-right');
+                    tr.classList.add('row-wrong');
+                    data[rowIndex].selected = "False";
+                });
+
+                actionTd.appendChild(rightBtn);
+                actionTd.appendChild(wrongBtn);
+                tr.appendChild(actionTd);
+
                 tbody.appendChild(tr);
             });
+
+            sampleData.connectionData = data;
         }
 
-        // Populate connection data table
-        // function populateConnectionTable(data) {
-        //     const thead = document.getElementById('connection-thead');
-        //     const tbody = document.getElementById('connection-tbody');
-        //     thead.innerHTML = "";
-        //     tbody.innerHTML = "";
-
-        //     if (data.length === 0) return;
-
-        //     // Create header
-        //     const headerRow = document.createElement('tr');
-        //     Object.keys(data[0]).forEach(key => {
-        //         const th = document.createElement('th');
-        //         th.textContent = key.replace('_', ' ').toUpperCase();
-        //         headerRow.appendChild(th);
-        //     });
-        //     thead.appendChild(headerRow);
-
-        //     // Create rows
-        //     data.forEach(row => {
-        //         const tr = document.createElement('tr');
-        //         Object.values(row).forEach(value => {
-        //             const td = document.createElement('td');
-        //             td.textContent = value;
-        //             tr.appendChild(td);
-        //         });
-        //         tbody.appendChild(tr);
-        //     });
-        // }
-
-    function populateConnectionTable(data) {
-        console.log('Populating connection table with data:', data);
-        const columnOrder = [
-            "source_component",
-            "source_terminal",
-            "dest_component",
-            "dest_terminal",
-            "wire_no",
-            "page_number",
-            "reason" // add reason column
-        ];
-        if (data == undefined || data.length === 0) return;
-
-
-        data = data.map(row => {
-            const reorderedRow = {};
-            columnOrder.forEach(col => {
-                if (row.hasOwnProperty(col)) {
-                    reorderedRow[col] = row[col];
-                }
-            });
-            // Add defaults
-            reorderedRow.selected = "";
-            reorderedRow.reason = reorderedRow.reason || ""; // default empty
-            return reorderedRow;
-        });
-
-        const thead = document.getElementById('connection-thead');
-        const tbody = document.getElementById('connection-tbody');
-        thead.innerHTML = "";
-        tbody.innerHTML = "";
-
-
-        // Create header
-        const headerRow = document.createElement('tr');
-        Object.keys(data[0]).forEach(key => {
-            if (key !== "selected") { // don't display selected as a column
-                const th = document.createElement('th');
-                th.textContent = key.replace('_', ' ').toUpperCase();
-                headerRow.appendChild(th);
-            }
-        });
-        headerRow.appendChild(document.createElement('th')); // for action buttons
-        thead.appendChild(headerRow);
-
-        // Create rows
-        data.forEach((row, rowIndex) => {
-            const tr = document.createElement('tr');
-            Object.entries(row).forEach(([key, value]) => {
-                if (key !== "selected") {
-                    const td = document.createElement('td');
-
-                    if (key === "reason") {
-                        // input box for reason
-                        const input = document.createElement('input');
-                        input.type = "text";
-                        input.value = value;
-                        input.placeholder = "Enter reason";
-                        input.addEventListener('input', (e) => {
-                            data[rowIndex].reason = e.target.value;
-                        });
-                        // prevent row click when focusing or clicking inside input
-                        input.addEventListener('click', (e) => e.stopPropagation());
-                        td.appendChild(input);
-                    } else {
-                        td.textContent = value;
-                    }
-
-                    tr.appendChild(td);
-                }
-            });
-
-            tr.addEventListener('click', () => {
-                const wireNo = row["wire_no"];  // adjust if key is different
-                const imageName = `Wire ${wireNo}`;
-                const imgIndex = currentDisplayedImages.findIndex(img => img.name === imageName);
-
-                if (imgIndex !== -1) {
-                    openOverlay(imgIndex, currentDisplayedImages[imgIndex]);
-                } else {
-                    console.warn(`No image found for ${imageName} in currentDisplayedImages`);
-                }
-            });
-
-            // Add buttons for "selected"
-            const actionTd = document.createElement('td');
-
-            const rightBtn = document.createElement('button');
-            rightBtn.textContent = "Right";
-            rightBtn.className = "btn-right";
-            rightBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                tr.classList.remove('row-wrong');
-                tr.classList.add('row-right');
-                data[rowIndex].selected = "True";
-            });
-
-            const wrongBtn = document.createElement('button');
-            wrongBtn.textContent = "Wrong";
-            wrongBtn.className = "btn-wrong";
-            wrongBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                tr.classList.remove('row-right');
-                tr.classList.add('row-wrong');
-                data[rowIndex].selected = "False";
-            });
-
-            actionTd.appendChild(rightBtn);
-            actionTd.appendChild(wrongBtn);
-            tr.appendChild(actionTd);
-
-            tbody.appendChild(tr);
-        });
-
-        // store back modified data (so downloadCSV can use it)
-        sampleData.connectionData = data;
-    }
         function loadAnalysisImages() {
             const container = document.getElementById('analysis-images');
             container.innerHTML = ""; // clear old content
@@ -956,7 +1241,7 @@
             grid.innerHTML = '';
             const currentPageNum = pageKeys[pageIndex];
             const images = groupedImages[currentPageNum];
-            let imagesPerPage = images.length;
+            let imagesPerPage = 10;
             const totalImagePages = Math.ceil(images.length / imagesPerPage);
 
             const startIndex = (imagePage - 1) * imagesPerPage;
@@ -975,7 +1260,7 @@
                 const imageDiv = document.createElement('div');
                 imageDiv.className = 'grid-image';
                 imageDiv.innerHTML = `
-                    <img src="${imgData.image}" alt="${imgData.name}" />
+                    <img src="${imgData.image_url}" alt="${imgData.name}" />
                     <div class="grid-image-info">${imgData.name}</div>
                 `;
 
@@ -1008,7 +1293,7 @@
                 imageDiv.className = 'grid-image';
                 
                 imageDiv.innerHTML = `
-                    <img src="${images[i].image}" alt="${images[i].name}" />
+                    <img src="${images[i].image_url}" alt="${images[i].name}" />
                     <div class="grid-image-info">${images[i].name}</div>
                 `;
                 
@@ -1026,8 +1311,8 @@
             const overlay = document.getElementById('image-overlay');
             const overlayImage = document.getElementById('overlay-image');
             const overlayInfo = document.getElementById('overlay-info');
-            
-            overlayImage.src = imageData.image;
+
+            overlayImage.src = imageData.image_url;
             overlayImage.alt = imageData.name;
             overlayInfo.textContent = imageData.name;
             
@@ -1053,7 +1338,7 @@
                 const overlayImage = document.getElementById('overlay-image');
                 const overlayInfo = document.getElementById('overlay-info');
                 
-                overlayImage.src = imageData.image;
+                overlayImage.src = imageData.image_url;
                 overlayImage.alt = imageData.name;
                 overlayInfo.textContent = imageData.name;
                 
@@ -1150,9 +1435,9 @@
         document.addEventListener('DOMContentLoaded', initializePage);
 
         function initializePage() {
-            populateWireTable(sampleData.wireData);
+            // populateWireTable(sampleData.wireData);
             populateConnectionTable(sampleData.connectionData);
-            loadAnalysisImages();
+            // loadAnalysisImages();
             initializePagination(sampleData.drawnLines);
         }
 

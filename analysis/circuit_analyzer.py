@@ -19,10 +19,16 @@ from ultralytics import YOLO
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Build the absolute path to your model
-MODEL_PATH = os.path.join(BASE_DIR, "models", "best.pt")
+TYPE_1_BEST_MODEL_PATH = os.path.join(BASE_DIR, "models", "type_1_best.pt")
+TYPE_1_BEST_MODEL = YOLO(TYPE_1_BEST_MODEL_PATH)
 
-# Load the model
-best_model = YOLO(MODEL_PATH)
+TYPE_2_BEST_MODEL_PATH = os.path.join(BASE_DIR, "models", "type_2_best.pt")
+TYPE_2_BEST_MODEL = YOLO(TYPE_2_BEST_MODEL_PATH)
+
+CLASSIFICATION_BEST_MODEL_PATH = os.path.join(BASE_DIR, "models", "classification_best.pt")
+CLASSIFICATION_BEST_MODEL = YOLO(CLASSIFICATION_BEST_MODEL_PATH)
+
+
 JUNCTION_INTERSECTION_THRESHOLD = 15  # Distance threshold for wire-junction intersections
 WIRE_CONNECTION_THRESHOLD = 15        # Distance threshold for wire endpoint connections
 JUNCTION_PARAM_THRESHOLD_START = 0.8 # Parameter threshold for detecting junction at wire start
@@ -151,9 +157,9 @@ def extract_shx_and_text(pdf_name, page_num, output_path=None):
                 new_x2 = y2
                 new_y2 = h - x1
                 
-                # Ensure coordinates are in correct order (min, max)
-                new_x1, new_x2 = min(new_x1, new_x2), max(new_x1, new_x2)
-                new_y1, new_y2 = min(new_y1, new_y2), max(new_y1, new_y2)
+            # Ensure coordinates are in correct order (min, max)
+            new_x1, new_x2 = min(new_x1, new_x2), max(new_x1, new_x2)
+            new_y1, new_y2 = min(new_y1, new_y2), max(new_y1, new_y2)
             
             sx1, sy1, sx2, sy2 = shrink_box(new_x1, new_y1, new_x2, new_y2)
             all_boxes.append((sx1, sy1, sx2, sy2, text_val, 1.0))
@@ -177,10 +183,10 @@ def extract_shx_and_text(pdf_name, page_num, output_path=None):
                         new_x2 = y1
                         new_y2 = h - x0
                         
-                        # Ensure coordinates are in correct order (min, max)
-                        new_x1, new_x2 = min(new_x1, new_x2), max(new_x1, new_x2)
-                        new_y1, new_y2 = min(new_y1, new_y2), max(new_y1, new_y2)
-                    
+                    # Ensure coordinates are in correct order (min, max)
+                    new_x1, new_x2 = min(new_x1, new_x2), max(new_x1, new_x2)
+                    new_y1, new_y2 = min(new_y1, new_y2), max(new_y1, new_y2)
+                
 
                     sx1, sy1, sx2, sy2 = shrink_box(new_x1, new_y1, new_x2, new_y2)
                     all_boxes.append((sx1, sy1, sx2, sy2, span["text"], 1.0))
@@ -189,6 +195,7 @@ def extract_shx_and_text(pdf_name, page_num, output_path=None):
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
     if output_path:
         cv2.imwrite(output_path, img_cv)
+
     return all_boxes, method_name
 
 def redact_image_by_boxes(image, boxes, fill_color=(255,255,255), shrink=2):
@@ -1437,7 +1444,6 @@ def find_closest_text(component, point, text_boxes):
 
     is_earthing = "earth" in component.lower()
     is_circuit = "circuit" in component.lower()
-
     # Calculate distances for all text boxes
     distances = []
     for i, (x1, y1, x2, y2, text, conf) in enumerate(text_boxes):
@@ -1447,14 +1453,12 @@ def find_closest_text(component, point, text_boxes):
     
     # Sort by distance (closest first)
     distances.sort(key=lambda x: x[0])
-    
     # Find the first valid text
     closest_valid_text = None
     closest_valid_category = None
     all_checked_texts = []
     if not is_earthing:
         for dist, idx, text in distances:
-            
             # For circle components, use special validation
             if is_circle_component:
                 is_valid = is_valid_circle_terminal(text)
@@ -1464,6 +1468,7 @@ def find_closest_text(component, point, text_boxes):
                     continue
                 is_valid = is_valid_text(text)
                 if is_circuit:
+                    print(text)
                     is_valid = is_numeric(text)
                 all_checked_texts.append((dist, text, is_valid, "general"))
 
@@ -1475,6 +1480,91 @@ def find_closest_text(component, point, text_boxes):
                 break
     
     return closest_valid_text
+
+
+def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
+    # --- Open PDF ---
+    doc = fitz.open(pdf_file)
+    fitz_page = doc[page_no - 1]
+
+    # --- Render original page ---
+    mat = fitz.Matrix(zoom, zoom)
+    pix = fitz_page.get_pixmap(matrix=mat)
+    img_cv = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+
+    # --- Run model inference ---
+    results = CLASSIFICATION_BEST_MODEL.predict(
+        source=img_cv,
+        conf=confidence,
+        save=False,
+        verbose=False
+    )
+
+    if not results or len(results[0].boxes) == 0:
+        print("⚠️ No detections found, returning original page & image")
+        return fitz_page, img_cv, None
+
+    # --- Extract bounding boxes ---
+    boxes = results[0].boxes.xyxy.cpu().numpy()  # [[x1, y1, x2, y2], ...]
+    class_ids = results[0].boxes.cls.cpu().numpy()
+    names = results[0].names
+
+    if len(boxes) > 1:
+        areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+        largest_idx = np.argmax(areas)
+        box = boxes[largest_idx]
+        class_id = int(class_ids[largest_idx])
+    else:
+        box = boxes[0]
+        class_id = int(class_ids[0])
+
+    x1, y1, x2, y2 = box
+
+    # --- Calculate area ratio ---
+    box_area = (x2 - x1) * (y2 - y1)
+    image_area = img_cv.shape[0] * img_cv.shape[1]
+    area_ratio = box_area / image_area
+
+    if area_ratio < 0.5:
+        print(f"⚠️ Detected box area ({area_ratio:.2%}) < 50%, ignoring.")
+        return fitz_page, img_cv, None
+
+    detected_class_name = names[class_id]
+
+    # --- Draw box for debugging ---
+    debug_img = img_cv.copy()
+    cv2.rectangle(
+        debug_img,
+        (int(x1), int(y1)), (int(x2), int(y2)),
+        (0, 255, 0), 3
+    )
+    cv2.putText(
+        debug_img,
+        detected_class_name,
+        (int(x1), max(int(y1) - 10, 20)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 255, 0),
+        2,
+        cv2.LINE_AA
+    )
+    cv2.imwrite("bnd_test.png", debug_img)
+
+    # --- Map to PDF coordinate space ---
+    x1_pdf, y1_pdf, x2_pdf, y2_pdf = [coord / zoom for coord in [x1, y1, x2, y2]]
+
+    # --- Crop PDF page ---
+    page_rect = fitz.Rect(x1_pdf, y1_pdf, x2_pdf, y2_pdf)
+    fitz_page.set_cropbox(page_rect)
+
+    # --- Re-render cropped page ---
+    cropped_pix = fitz_page.get_pixmap(matrix=mat)
+    cropped_img_cv = np.frombuffer(cropped_pix.samples, dtype=np.uint8).reshape(cropped_pix.height, cropped_pix.width, cropped_pix.n)
+
+    cv2.imwrite("DETECTED.png", cropped_img_cv)
+
+    return fitz_page, cropped_img_cv, detected_class_name
+
 
 from .test_only_lines import draw_connections_from_df
 def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enable_network_colors=True, wire_connection_threshold=WIRE_CONNECTION_THRESHOLD, xml=None):
@@ -1490,40 +1580,52 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     fitz_page = doc[page_no - 1]
     mat = fitz.Matrix(zoom, zoom)
     pix = fitz_page.get_pixmap(matrix=mat)
-    img_cv = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+    # img_cv = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
 
 
-    if pix.n == 4:
-        img_cv = cv2.cvtColor(img_cv, cv2.COLOR_RGBA2BGR)
-    else:
-        img_cv = cv2.cvtColor(img_cv, cv2.COLOR_RGB2BGR)
 
-
-    # Load original image
-    img = img_cv
+    # # Load original image
+    # img = img_cv
     
-    # Apply cropping if specified
-    if crop_params:
-        x, y, w, h = crop_params
-        cropped_img = img[y:y+h, x:x+w]
-    else:
-        # Default crop parameters
-        x, y, w, h = 60, 57, 3249, 2028
-        cropped_img = img[y:y+h, x:x+w]
+    # # Apply cropping if specified
+    # if crop_params:
+    #     x, y, w, h = crop_params
+    #     cropped_img = img[y:y+h, x:x+w]
+    # else:
+    #     # Default crop parameters
+    #     x, y, w, h = 60, 57, 3249, 2028
+    #     cropped_img = img[y:y+h, x:x+w]
     
     # Should be in this format: boxes.append((xmin, ymin, xmax, ymax, name))
     # bounding_boxes = 
     confidence = 0.5
 
-    results = best_model.predict(
-        source=cropped_img,
-        conf=confidence,
-        save=False,
-        verbose=False
-    )
+    fitz_page, cropped_img, detected_class_name = detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5)
+    if cropped_img.shape[2] == 4:  # 4 channels -> RGBA
+        cropped_img = cv2.cvtColor(cropped_img, cv2.COLOR_RGBA2BGR)
+    else:  # 3 channels -> RGB
+        cropped_img = cv2.cvtColor(cropped_img, cv2.COLOR_RGB2BGR)
+
+    print(f"Detected main object: {detected_class_name}")
+    bounding_boxes = []
+    if detected_class_name == '0':
+        results = TYPE_1_BEST_MODEL.predict(
+            source=cropped_img,
+            conf=confidence,
+            save=False,
+            verbose=False
+        )
+    elif detected_class_name == '1':
+        results = TYPE_2_BEST_MODEL.predict(
+            source=cropped_img,
+            conf=confidence,
+            save=False,
+            verbose=False
+        )
+    else: 
+        return None, None, [], [], [], None
 
     # Extract bounding boxes
-    bounding_boxes = []
     for result in results:
         boxes = result.boxes
         for box in boxes:
@@ -1552,10 +1654,10 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         x1, y1, x2, y2, text_val, conf = box
 
         # Offset by crop origin
-        new_x1 = max(0, x1 - x)
-        new_y1 = max(0, y1 - y)
-        new_x2 = min(w, x2 - x)
-        new_y2 = min(h, y2 - y)
+        new_x1 = max(0, x1 - 0)
+        new_y1 = max(0, y1 - 0)
+        new_x2 = min(0, x2 - 0)
+        new_y2 = min(0, y2 - 0)
 
         # Only keep boxes that are at least partially inside crop
         if new_x1 < new_x2 and new_y1 < new_y2:
@@ -1828,6 +1930,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             subset=["source_component", "source_terminal", "dest_component", "dest_terminal"],
             how="all"
         )
+        df_connections["type"] = "Power Line Diagram" if detected_class_name == '0' else "Control Line Diagram"
 
         # print("Step 5: Drawing connections from DataFrame")
         drawn_lines_lst = draw_connections_from_df(
