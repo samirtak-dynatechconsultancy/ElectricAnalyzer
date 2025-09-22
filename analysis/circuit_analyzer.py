@@ -1590,7 +1590,7 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
 
     if not results or len(results[0].boxes) == 0:
         print("⚠️ No detections found, returning original page & image")
-        return fitz_page, img_cv, None
+        return fitz_page, img_cv, None, 0, 0, 0, 0
 
     # --- Extract bounding boxes ---
     boxes = results[0].boxes.xyxy.cpu().numpy()  # [[x1, y1, x2, y2], ...]
@@ -1614,7 +1614,7 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
     area_ratio = box_area / image_area
 
     if area_ratio < 0.5:
-        return fitz_page, img_cv, None
+        return fitz_page, img_cv, None, 0, 0, 0, 0
 
     detected_class_name = names[class_id]
 
@@ -1654,7 +1654,7 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
     cropped_img_cv = np.frombuffer(cropped_pix.samples, dtype=np.uint8).reshape(cropped_pix.height, cropped_pix.width, cropped_pix.n)
 
     # cv2.imwrite("DETECTED.png", cropped_img_cv)
-
+    print(fitz_page, cropped_img_cv, detected_class_name, x,y,w,h)
     return fitz_page, cropped_img_cv, detected_class_name, x,y,w,h
 
 

@@ -394,6 +394,26 @@
                 });
             }
         });
+function renderComponentOverlays(pageNum) {
+    console.log('renderComponentOverlays called for page:', pageNum);
+    const overlay = document.getElementById('component-overlay');
+    if (!overlay) {
+        console.error('Component overlay element not found');
+        return;
+    }
+    
+    overlay.innerHTML = ''; // Clear old boxes
+
+    if (!pageComponents[pageNum]) {
+        console.log('No components for page:', pageNum);
+        return;
+    }
+
+    console.log('Rendering', pageComponents[pageNum].length, 'components');
+    pageComponents[pageNum].forEach(c => {
+        drawComponentOverlay(c.x, c.y, c.width, c.height);
+    });
+}
 
         function enablePageSelection() {
             // Show PDF preview tab and switch to it
@@ -443,15 +463,19 @@
                     .then(data => {
                         if (data.success) {
                             console.log('PDF uploaded successfully:', data);
+                            submitBtn.style.display = 'inline-block';
                         } else {
                             console.error('Error uploading PDF:', data.error);
+                            submitBtn.style.display = 'none';
                         }
                     })
                     .catch(function (error) {
                         console.error('Error uploading PDF:', error);
+                        submitBtn.style.display = 'none';
                     });
                 }).catch(function (error) {
                     console.error('Error loading PDF document', error);
+                    submitBtn.style.display = 'none';
                 });
             };
 
@@ -462,76 +486,94 @@
             fileReader.readAsArrayBuffer(file);
         }
 
-        function renderPdfPage(pageNumber, canvasId = 'pdf-canvas') {
-            if (!pdfDoc) {
-                return;
-            }
-
-            pdfDoc.getPage(pageNumber).then(function (page) {
-                const canvas = document.getElementById(canvasId);
-                const context = canvas.getContext('2d');
-
-                // Calculate scale based on container width
-                const container = canvas.parentElement;
-                const containerWidth = container.clientWidth - 60; // Account for padding
-                const viewport = page.getViewport({ scale: 1 });
-                
-                // Store original page dimensions
-                if (canvasId === 'selected-pdf-canvas') {
-                    originalPageWidth = viewport.width;
-                    originalPageHeight = viewport.height;
-                }
-                
-                const scale = Math.min(containerWidth / viewport.width, 1.5);
-                const scaledViewport = page.getViewport({ scale: scale });
-
-                canvas.height = scaledViewport.height;
-                canvas.width = scaledViewport.width;
-
-                // Calculate scale factors for coordinate conversion
-                if (canvasId === 'selected-pdf-canvas') {
-                    scaleX = canvas.width / originalPageWidth;
-                    scaleY = canvas.height / originalPageHeight;
-                }
-
-                const renderContext = {
-                    canvasContext: context,
-                    viewport: scaledViewport
-                };
-
-                page.render(renderContext).promise.then(function () {
-                    if (canvasId === 'pdf-canvas') {
-                        document.getElementById('current-pdf-page').textContent = pageNumber;
-                        document.getElementById('pdf-page-input').value = pageNumber;
-
-                        // Update navigation buttons
-                        document.getElementById('pdf-prev-btn').disabled = pageNumber <= 1;
-                        document.getElementById('pdf-next-btn').disabled = pageNumber >= totalPdfPages;
-
-                        // Update selection indicator
-                        updateSelectionIndicator();
-                        attachScrollListener();
-                    }
-                }).catch(function (error) {
-                    console.error('Error rendering PDF page', error);
-                });
-            }).catch(function (error) {
-                console.error('Error getting PDF page', error);
-            });
-
-            function renderComponentOverlays(pageNum) {
-                const overlay = document.getElementById('component-overlay');
-                overlay.innerHTML = ''; // Clear old boxes
-
-                if (!pageComponents[pageNum]) return;
-
-                pageComponents[pageNum].forEach(c => {
-                    drawComponentOverlay(c.x, c.y, c.width, c.height);
-                });
-            }
-            renderComponentOverlays(selectedPagesArray[currentSelectedPageIndex]);
-
+function renderPdfPage(pageNumber, canvasId = 'pdf-canvas') {
+    console.log('renderPdfPage called with:', pageNumber, canvasId);
+    
+    if (!pdfDoc) {
+        console.error('pdfDoc is null');
+        return;
+    }
+    
+    pdfDoc.getPage(pageNumber).then(function (page) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) {
+            console.error('Canvas not found:', canvasId);
+            return;
         }
+        
+        const context = canvas.getContext('2d');
+
+        // Calculate scale based on container width
+        const container = canvas.parentElement;
+        let containerWidth = container.clientWidth;
+        
+        // More robust container width calculation
+        if (containerWidth <= 60) {
+            // Fallback: use a reasonable default width
+            containerWidth = 800;
+            console.warn('Container width too small, using fallback:', containerWidth);
+        } else {
+            // Only subtract padding if we have enough width
+            containerWidth = containerWidth - 60;
+        }
+        
+        console.log('Container width:', container.clientWidth, 'Adjusted width:', containerWidth);
+        
+        const viewport = page.getViewport({ scale: 1 });
+        console.log('Original viewport:', viewport.width, 'x', viewport.height);
+        
+        // Store original page dimensions
+        if (canvasId === 'selected-pdf-canvas') {
+            originalPageWidth = viewport.width;
+            originalPageHeight = viewport.height;
+        }
+        
+        // Ensure minimum scale and reasonable maximum
+        let scale = Math.min(containerWidth / viewport.width, 1.5);
+        scale = Math.max(scale, 0.3); // Minimum scale of 0.3
+        
+        const scaledViewport = page.getViewport({ scale: scale });
+        
+        console.log('Scale factor:', scale);
+        console.log('Scaled viewport:', scaledViewport.width, 'x', scaledViewport.height);
+
+        // Ensure reasonable canvas dimensions
+        canvas.width = Math.max(scaledViewport.width, 100);
+        canvas.height = Math.max(scaledViewport.height, 100);
+        
+        console.log('Canvas dimensions set:', canvas.width, 'x', canvas.height);
+
+        // Calculate scale factors for coordinate conversion
+        if (canvasId === 'selected-pdf-canvas') {
+            scaleX = canvas.width / originalPageWidth;
+            scaleY = canvas.height / originalPageHeight;
+            console.log('Scale factors:', scaleX, scaleY);
+        }
+
+        const renderContext = {
+            canvasContext: context,
+            viewport: scaledViewport
+        };
+
+        page.render(renderContext).promise.then(function () {
+            console.log('Page render completed successfully');
+            
+            if (canvasId === 'pdf-canvas') {
+                document.getElementById('current-pdf-page').textContent = pageNumber;
+                document.getElementById('pdf-page-input').value = pageNumber;
+                document.getElementById('pdf-prev-btn').disabled = pageNumber <= 1;
+                document.getElementById('pdf-next-btn').disabled = pageNumber >= totalPdfPages;
+                updateSelectionIndicator();
+            } else if (canvasId === 'selected-pdf-canvas') {
+                renderComponentOverlays(pageNumber);
+            }
+        }).catch(function (error) {
+            console.error('Error rendering PDF page:', error);
+        });
+    }).catch(function (error) {
+        console.error('Error getting PDF page:', error);
+    });
+}
 
         function attachScrollListener() {
             const pdfCanvas = document.getElementById("pdf-canvas");
@@ -582,27 +624,28 @@
             }
         }
 
-        function handlePageSelection() {
-            if (!isSelectionMode) return;
+function handlePageSelection() {
+    if (!isSelectionMode) return;
 
-            if (selectedPages.has(currentPdfPage)) {
-                selectedPages.delete(currentPdfPage);
-            } else {
-                selectedPages.add(currentPdfPage);
-            }
+    if (selectedPages.has(currentPdfPage)) {
+        selectedPages.delete(currentPdfPage);
+    } else {
+        selectedPages.add(currentPdfPage);
+    }
 
-            updateSelectedPagesInput();
-            updateSelectionIndicator();
-            updateSelectedPagesDisplay();
-            
-            // Show/hide analyze button based on selection
-            const submitBtn = document.getElementById('submit-btn');
-            if (selectedPages.size > 0) {
-                submitBtn.style.display = 'inline-block';
-            } else {
-                submitBtn.style.display = 'none';
-            }
-        }
+    // IMPORTANT: Update both the input and display in the correct order
+    updateSelectedPagesInput(); // This updates selectedPagesArray
+    updateSelectionIndicator();
+    updateSelectedPagesDisplay(); // This uses selectedPagesArray
+    
+    // Show/hide analyze button based on selection
+    const submitBtn = document.getElementById('submit-btn');
+    if (selectedPages.size > 0) {
+        submitBtn.style.display = 'inline-block';
+    } else {
+        submitBtn.style.display = 'none';
+    }
+}
 
         function updateSelectionUI() {
             const selectBtn = document.getElementById('select-toggle-btn');
@@ -619,41 +662,43 @@
             }
         }
 
-        function updateSelectedPagesInput() {
-            const input = document.getElementById('selected-pages');
-            const sortedPages = Array.from(selectedPages).sort((a, b) => a - b);
-            selectedPagesArray = sortedPages; // Update array for navigation
+       function updateSelectedPagesInput() {
+    const input = document.getElementById('selected-pages');
+    const sortedPages = Array.from(selectedPages).sort((a, b) => a - b);
+    
+    // IMPORTANT: Update selectedPagesArray here consistently
+    selectedPagesArray = sortedPages;
 
-            if (sortedPages.length === 0) {
-                input.value = '';
-                return;
+    if (sortedPages.length === 0) {
+        input.value = '';
+        return;
+    }
+
+    // Convert to ranges for better readability
+    const ranges = [];
+    let start = sortedPages[0];
+    let end = start;
+
+    for (let i = 1; i <= sortedPages.length; i++) {
+        if (i < sortedPages.length && sortedPages[i] === end + 1) {
+            end = sortedPages[i];
+        } else {
+            if (start === end) {
+                ranges.push(start.toString());
+            } else if (end === start + 1) {
+                ranges.push(start.toString(), end.toString());
+            } else {
+                ranges.push(`${start}-${end}`);
             }
-
-            // Convert to ranges for better readability
-            const ranges = [];
-            let start = sortedPages[0];
-            let end = start;
-
-            for (let i = 1; i <= sortedPages.length; i++) {
-                if (i < sortedPages.length && sortedPages[i] === end + 1) {
-                    end = sortedPages[i];
-                } else {
-                    if (start === end) {
-                        ranges.push(start.toString());
-                    } else if (end === start + 1) {
-                        ranges.push(start.toString(), end.toString());
-                    } else {
-                        ranges.push(`${start}-${end}`);
-                    }
-                    if (i < sortedPages.length) {
-                        start = sortedPages[i];
-                        end = start;
-                    }
-                }
+            if (i < sortedPages.length) {
+                start = sortedPages[i];
+                end = start;
             }
-
-            input.value = ranges.join(', ');
         }
+    }
+
+    input.value = ranges.join(', ');
+}
 
         function updateSelectionIndicator() {
             const indicator = document.getElementById('selection-indicator');
@@ -665,45 +710,69 @@
             }
         }
 
-        function updateSelectedPagesDisplay() {
-            const selectedPdfName = document.getElementById('selected-pdf-name');
-            const selectedPagesInfo = document.getElementById('selected-pages-info');
-            const selectedPagesDisplay = document.getElementById('selected-pages-display');
-            const selectedPagesList = document.getElementById('selected-pages-list');
-            const selectedPdfControls = document.getElementById('selected-pdf-controls');
-            const selectedPdfCanvas = document.getElementById('selected-pdf-canvas');
-            const noSelectionMessage = document.querySelector('.no-selection-message');
 
-            if (selectedPages.size === 0) {
-                selectedPagesInfo.style.display = 'none';
-                selectedPagesDisplay.style.display = 'none';
-                selectedPdfControls.style.display = 'none';
-                selectedPdfCanvas.style.display = 'none';
-                noSelectionMessage.style.display = 'block';
-                selectedPdfName.textContent = 'No pages selected';
-            } else {
-                selectedPagesInfo.style.display = 'inline';
-                selectedPagesDisplay.style.display = 'inline';
-                selectedPdfControls.style.display = 'flex';
-                selectedPdfCanvas.style.display = 'block';
-                noSelectionMessage.style.display = 'none';
-                selectedPdfName.textContent = pdfFileName;
-                
-                // Update selected pages list display
-                const sortedPages = Array.from(selectedPages).sort((a, b) => a - b);
-                selectedPagesList.textContent = sortedPages.join(', ');
-                
-                // Update total selected pages
-                document.getElementById('total-selected-pages').textContent = selectedPages.size;
-                
-                // Show first selected page
-                if (selectedPagesArray.length > 0) {
-                    currentSelectedPageIndex = 0;
-                    renderPdfPage(selectedPagesArray[currentSelectedPageIndex], 'selected-pdf-canvas');
-                    updateSelectedPageNavigation();
-                }
-            }
+function updateSelectedPagesDisplay() {
+    console.log('updateSelectedPagesDisplay called');
+    
+    const selectedPdfName = document.getElementById('selected-pdf-name');
+    const selectedPagesInfo = document.getElementById('selected-pages-info');
+    const selectedPagesDisplay = document.getElementById('selected-pages-display');
+    const selectedPagesList = document.getElementById('selected-pages-list');
+    const selectedPdfControls = document.getElementById('selected-pdf-controls');
+    const selectedPdfCanvas = document.getElementById('selected-pdf-canvas');
+    const noSelectionMessage = document.querySelector('.no-selection-message');
+
+    if (selectedPages.size === 0) {
+        selectedPagesInfo.style.display = 'none';
+        selectedPagesDisplay.style.display = 'none';
+        selectedPdfControls.style.display = 'none';
+        selectedPdfCanvas.style.display = 'none';
+        noSelectionMessage.style.display = 'block';
+        selectedPdfName.textContent = 'No pages selected';
+    } else {
+        selectedPagesInfo.style.display = 'inline';
+        selectedPagesDisplay.style.display = 'inline';
+        selectedPdfControls.style.display = 'flex';
+        selectedPdfCanvas.style.display = 'block';
+        noSelectionMessage.style.display = 'none';
+        selectedPdfName.textContent = pdfFileName;
+        
+        // Update selected pages list display
+        const sortedPages = Array.from(selectedPages).sort((a, b) => a - b);
+        selectedPagesList.textContent = sortedPages.join(', ');
+        document.getElementById('total-selected-pages').textContent = selectedPages.size;
+        
+        selectedPagesArray = sortedPages;
+        
+        if (selectedPagesArray.length > 0) {
+            currentSelectedPageIndex = 0;
+            const pageToRender = selectedPagesArray[currentSelectedPageIndex];
+            
+            // Ensure proper container sizing before rendering
+            setTimeout(() => {
+                ensureCanvasContainerSize();
+                renderPdfPage(pageToRender, 'selected-pdf-canvas');
+                updateSelectedPageNavigation();
+            }, 150); // Slightly longer delay to ensure DOM is ready
         }
+    }
+}
+function ensureCanvasContainerSize() {
+    const selectedPdfDisplay = document.getElementById('selected-pdf-display');
+    if (selectedPdfDisplay) {
+        // Force a minimum width if not set
+        const computedStyle = window.getComputedStyle(selectedPdfDisplay);
+        const width = parseInt(computedStyle.width);
+        console.log('Selected PDF display width:', width);
+        
+        if (width < 100) {
+            selectedPdfDisplay.style.width = '800px';
+            selectedPdfDisplay.style.minHeight = '600px';
+            console.log('Set fallback dimensions for selected PDF display');
+        }
+    }
+}
+
 
         function changeSelectedPdfPage(delta) {
             const newIndex = currentSelectedPageIndex + delta;
@@ -1246,6 +1315,10 @@
             grid.innerHTML = '';
             const currentPageNum = pageKeys[pageIndex];
             const images = groupedImages[currentPageNum];
+            if (images == undefined) {
+                throw new Error("Not able to classify the images on this page");
+            }
+
             let imagesPerPage = images.length;
             const totalImagePages = Math.ceil(images.length / imagesPerPage);
 
