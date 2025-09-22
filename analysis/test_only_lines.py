@@ -166,3 +166,35 @@ def draw_connections_from_df(wire_df, img):
         images_list.append((wire_name, copy_img))
 
     return images_list
+
+
+def draw_connections_from_df_connections(df_connections, img):
+    images_list = []
+
+    for _, row in df_connections.iterrows():
+        src_point = row.get('source_point')
+        src_component = row.get('source_component', 'Unknown Source')
+        src_terminal = row.get('source_terminal', 'Unknown Term')
+        dst_point = row.get('dest_point')
+        dst_component = row.get('dest_component', 'Unknown Dest')
+        dst_terminal = row.get('dest_terminal', 'Unknown Term')
+        wire_no = row.get('wire_no', 'Unknown Wire')
+
+        # Skip if coordinates are missing
+        # if src_point is None or dst_point is None:
+        #     continue
+
+        # Copy the original image for this connection
+        copy_img = img.copy()
+
+        # Draw source/destination dots
+        cv2.circle(copy_img, tuple(src_point), 6, (0, 140, 255), -1)
+        cv2.circle(copy_img, tuple(dst_point), 6, (0, 140, 255), -1)
+
+        # Draw line between them
+        cv2.line(copy_img, tuple(src_point), tuple(dst_point), (0, 0, 255), 2)
+
+        # Add to list with wire name
+        images_list.append((f"{_}", f"{src_component}.{src_terminal}->{dst_component}.{dst_terminal}",copy_img))
+
+    return images_list

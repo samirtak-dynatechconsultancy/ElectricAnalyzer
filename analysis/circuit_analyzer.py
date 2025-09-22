@@ -271,57 +271,75 @@ def is_prohibited_connection(label1, label2):
     return False
 
 
-def find_wire_endpoint_connections_with_text(all_wires, text_boxes, threshold=WIRE_CONNECTION_THRESHOLD):
+def point_inside_box(point, boxes):
+    """Return True if point is inside any box."""
+    x, y = point
+    for xmin, ymin, xmax, ymax, _name in boxes:
+        if xmin <= x <= xmax and ymin <= y <= ymax:
+            return True
+    return False
+
+def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_boxes, threshold=WIRE_CONNECTION_THRESHOLD):
     """
-    Extended version that uses closest text for each endpoint and filters out invalid connections.
+    Finds wire endpoint connections while ignoring endpoints inside bounding boxes.
     """
     connections = []
-    
+
     for i, wire1 in enumerate(all_wires):
         y1_1, y2_1, x1_1, x2_1 = wire1.line
         wire1_start = (x1_1, y1_1)
         wire1_end = (x2_1, y2_1)
-        
+
         length_1 = math.sqrt((x2_1 - x1_1)**2 + (y2_1 - y1_1)**2)
         if length_1 < MIN_LENGTH:
             continue
-        
+
+        # Skip endpoints inside bounding boxes
+        if point_inside_box(wire1_start, bounding_boxes) and point_inside_box(wire1_end, bounding_boxes):
+            continue
+
         for j, wire2 in enumerate(all_wires):
             if i >= j:
                 continue
-                
+
             y1_2, y2_2, x1_2, x2_2 = wire2.line
             wire2_start = (x1_2, y1_2)
             wire2_end = (x2_2, y2_2)
-            
+
             length_2 = math.sqrt((x2_2 - x1_2)**2 + (y2_2 - y1_2)**2)
             if length_2 < MIN_LENGTH:
                 continue
-            
+
+            # Skip endpoints inside bounding boxes
+            if point_inside_box(wire2_start, bounding_boxes) and point_inside_box(wire2_end, bounding_boxes):
+                continue
+
             endpoint_pairs = [
                 (wire1_start, 'start', wire2_start, 'start'),
                 (wire1_start, 'start', wire2_end, 'end'),
                 (wire1_end, 'end', wire2_start, 'start'),
                 (wire1_end, 'end', wire2_end, 'end')
             ]
-            
+
             for (p1, end1, p2, end2) in endpoint_pairs:
+                # Skip if either endpoint is inside a bounding box
+                if point_inside_box(p1, bounding_boxes) or point_inside_box(p2, bounding_boxes):
+                    continue
+
                 distance = math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
                 if distance <= threshold:
                     # Find closest text for both endpoints
                     label1 = find_closest_text("source", p1, text_boxes)
                     label2 = find_closest_text("source", p2, text_boxes)
-                    
+
                     if is_prohibited_connection(label1, label2):
-                        # Debug info (optional)
-                        # print(f"Skipping prohibited connection {label1} - {label2}")
                         continue
-                    
+
                     connections.append((i, end1, j, end2, distance))
-    
+
     return connections
 
-def build_circuit_graph(horiz_wires, vert_wires, junction_points, text_boxes,
+def build_circuit_graph(horiz_wires, vert_wires, junction_points, text_boxes, bounding_box,
                        junction_threshold=JUNCTION_INTERSECTION_THRESHOLD, 
                        wire_connection_threshold=WIRE_CONNECTION_THRESHOLD):
     """
@@ -337,7 +355,7 @@ def build_circuit_graph(horiz_wires, vert_wires, junction_points, text_boxes,
     all_wires = list(horiz_wires) + list(vert_wires)
 
     intersections = find_line_junction_intersections(all_wires, junction_points, junction_threshold)
-    wire_connections = find_wire_endpoint_connections_with_text(all_wires, text_boxes, wire_connection_threshold)
+    wire_connections = find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box, wire_connection_threshold)
     
     # print(f"Found {len(wire_connections)} wire-to-wire endpoint connections (threshold: {wire_connection_threshold})")
     # print(f"Found {len(intersections)} wire-junction intersections (threshold: {junction_threshold})")
@@ -547,7 +565,7 @@ def generate_maximally_distinct_colors(num_colors):
     
     return colors
 
-def assign_wire_colors_by_network(horiz_wires, vert_wires, junction_points, text_boxes,
+def assign_wire_colors_by_network(horiz_wires, vert_wires, junction_points, text_boxes, bounding_box,
                                  junction_threshold=JUNCTION_INTERSECTION_THRESHOLD,
                                  wire_connection_threshold=WIRE_CONNECTION_THRESHOLD):
     """
@@ -556,7 +574,7 @@ def assign_wire_colors_by_network(horiz_wires, vert_wires, junction_points, text
     """    
     all_wires = list(horiz_wires) + list(vert_wires)
     graph, wire_endpoints, junction_nodes, intersections = build_circuit_graph(
-        horiz_wires, vert_wires, junction_points, text_boxes)
+        horiz_wires, vert_wires, junction_points, text_boxes, bounding_box)
     
     # Find connected components (networks) using DFS
     visited_nodes = set()
@@ -640,7 +658,7 @@ def assign_wire_colors_by_network(horiz_wires, vert_wires, junction_points, text
         
     return wire_colors, networks, network_colors
 
-def analyze_circuit_flow_improved(horiz_wires, vert_wires, junction_points, text_boxes, threshold=15, wire_connection_threshold=10):
+def analyze_circuit_flow_improved(horiz_wires, vert_wires, junction_points, text_boxes, bounding_box, threshold=15, wire_connection_threshold=10):
     """
     Improved circuit flow analysis that:
     1. Groups wires by connected networks (including wire-to-wire connections)
@@ -649,15 +667,15 @@ def analyze_circuit_flow_improved(horiz_wires, vert_wires, junction_points, text
     """    
     all_wires = list(horiz_wires) + list(vert_wires)
     graph, wire_endpoints, junction_nodes, intersections = build_circuit_graph(
-        horiz_wires, vert_wires, junction_points, text_boxes)
+        horiz_wires, vert_wires, junction_points, text_boxes, bounding_box)
     
     # Find connected components and assign base colors
     # TODO: Check
     # wire_colors, networks, network_colors = assign_wire_colors_by_network(
     #     horiz_wires, vert_wires, junction_points, threshold, wire_connection_threshold)
     wire_colors, networks, network_colors = assign_wire_colors_by_network(
-        horiz_wires, vert_wires, junction_points, text_boxes)
-    
+        horiz_wires, vert_wires, junction_points, text_boxes, bounding_box)
+
     num_networks = len(networks)
     unique_base_colors = generate_unique_colors(num_networks)
 
@@ -895,7 +913,7 @@ def importImageNew(img):
 
     return Image(img, "none")
 
-def line_detection_improved(image_path, text_boxes, draw_on_canvas=None, junction_points=None, enable_network_colors=True):
+def line_detection_improved(image_path, text_boxes, bounding_box, draw_on_canvas=None, junction_points=None, enable_network_colors=True):
         """
         Improved line detection with better flow analysis and network coloring
         """
@@ -927,7 +945,7 @@ def line_detection_improved(image_path, text_boxes, draw_on_canvas=None, junctio
         if junction_points and enable_network_colors:
             intersections = find_line_junction_intersections(all_wires, junction_points)
             wire_colors, networks, network_colors, junction_nodes = analyze_circuit_flow_improved(
-                HorizWires, VertWires, junction_points, text_boxes)
+                HorizWires, VertWires, junction_points, text_boxes, bounding_box)
             # print(f"Found {len(intersections)} line-junction intersections")
             # print(f"Identified {len(networks)} electrical networks")
 
@@ -1622,6 +1640,11 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
     # --- Map to PDF coordinate space ---
     x1_pdf, y1_pdf, x2_pdf, y2_pdf = [coord / zoom for coord in [x1, y1, x2, y2]]
 
+    x = x1
+    y = y1
+    w = x2 - x1
+    h = y2 - y1
+
     # --- Crop PDF page ---
     page_rect = fitz.Rect(x1_pdf, y1_pdf, x2_pdf, y2_pdf)
     fitz_page.set_cropbox(page_rect)
@@ -1632,10 +1655,10 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
 
     # cv2.imwrite("DETECTED.png", cropped_img_cv)
 
-    return fitz_page, cropped_img_cv, detected_class_name
+    return fitz_page, cropped_img_cv, detected_class_name, x,y,w,h
 
 
-from .test_only_lines import draw_connections_from_df
+from .test_only_lines import draw_connections_from_df_connections
 def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enable_network_colors=True, wire_connection_threshold=WIRE_CONNECTION_THRESHOLD, xml=None):
     """
     Improved combined function with better flow analysis
@@ -1669,7 +1692,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     # bounding_boxes = 
     confidence = 0.5
 
-    fitz_page, cropped_img, detected_class_name = detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5)
+    fitz_page, cropped_img, detected_class_name,crop_x, crop_y, crop_w, crop_h = detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5)
     if cropped_img.shape[2] == 4:  # 4 channels -> RGBA
         cropped_img = cv2.cvtColor(cropped_img, cv2.COLOR_RGBA2BGR)
     else:  # 3 channels -> RGB
@@ -1718,17 +1741,24 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     # print("\n=== STEP 2: Text Detection and Removal ===")
     boxes, used = extract_shx_and_text(pdf_file, page_no, 'test.png')
 
+    img_cv = cropped_img.copy()
     cropped_boxes = []
     for box in boxes:
         x1, y1, x2, y2, text_val, conf = box
+        
+        new_x1 = int(max(0, x1 - crop_x))
+        new_y1 = int(max(0, y1 - crop_y))
+        new_x2 = int(min(img_cv.shape[1], x2 - crop_x))
+        new_y2 = int(min(img_cv.shape[0], y2 - crop_y))
 
-        # Offset by crop origin
-        new_x1 = max(0, x1 - 0)
-        new_y1 = max(0, y1 - 0)
-        new_x2 = min(0, x2 - 0)
-        new_y2 = min(0, y2 - 0)
 
-        # Only keep boxes that are at least partially inside crop
+        cv2.rectangle(img_cv, (new_x1, new_y1), (new_x2, new_y2), (255, 0, 0), 2)
+        cv2.putText(img_cv, text_val, (new_x1, new_y1 - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+
+        # cv2.imwrite("detected_text.png", img_cv)
+
+    #     # Only keep boxes that are at least partially inside crop
         if new_x1 < new_x2 and new_y1 < new_y2:
             cropped_boxes.append((new_x1, new_y1, new_x2, new_y2, text_val, conf))
     boxes = cropped_boxes
@@ -1736,12 +1766,12 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     # print(f"REDACTED::::::::::::::::::::::::: {redacted_path}")
     text_redacted_img = redact_image_by_boxes(cropped_with_junctions, boxes, fill_color=(255,255,255), shrink=2)
     # print(f"[INFO] OCR Module Used: {used}")
-
+    # cv2.imwrite("text_redacted.png", text_redacted_img)
     # Step 3: Improved line detection
     # print("\n=== STEP 3: Improved Line Detection ===")
     # Perform improved line detection
     line_canvas, horiz_wires, vert_wires, junction_points = line_detection_improved(
-        text_redacted_img, junction_points=junction_points, text_boxes=boxes, enable_network_colors=enable_network_colors)
+        text_redacted_img, junction_points=junction_points, text_boxes=boxes, bounding_box=bounding_boxes, enable_network_colors=enable_network_colors)
 
     if line_canvas is not None:
         line_canvas = cv2.cvtColor(line_canvas, cv2.COLOR_BGR2RGB)
@@ -1757,7 +1787,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         if enable_network_colors:
             intersections = find_line_junction_intersections(all_wires, junction_points)
             wire_colors, networks, network_colors, junction_nodes = analyze_circuit_flow_improved(
-                horiz_wires, vert_wires, junction_points, text_boxes=boxes)
+                horiz_wires, vert_wires, junction_points, text_boxes=boxes, bounding_box=bounding_boxes)
 
             # Draw wires with network colors and flow analysis
             for idx, wire in enumerate(horiz_wires):
@@ -1944,7 +1974,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             # Sort by x first, then y
             sorted_points = sorted(points, key=lambda p: (p[0], p[1]))
             source_point = sorted_points[0]
-            
+
             # Get component with unique ID
             source_component = find_component_with_id(source_point, bounding_boxes)
             source_terminal = find_closest_text(source_component, source_point, boxes)
@@ -1953,12 +1983,24 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 dest_component = find_component_with_id(target_point, bounding_boxes)
                 dest_terminal = find_closest_text(dest_component, target_point, boxes)
 
-                # Always add the record, even if components are None/empty
-                records_new.append((wire_no, 
-                            source_component if source_component else "", 
-                            source_terminal if source_terminal else "",
-                            dest_component if dest_component else "", 
-                            dest_terminal if dest_terminal else ""))
+                if source_component and dest_component and "surge" in source_component.lower() and "surge" in dest_component.lower():
+                    continue
+                if source_component and dest_component and "sensor" in source_component.lower() and "sensor" in dest_component.lower():
+                    continue
+                if source_component and dest_component and "sensor" in source_component.lower() and "breaker" in dest_component.lower():
+                    continue
+                
+                # Append coordinates too
+                records_new.append((
+                    wire_no,
+                    source_component if source_component else "",
+                    source_terminal if source_terminal else "",
+                    dest_component if dest_component else "",
+                    dest_terminal if dest_terminal else "",
+                    source_point,
+                    target_point 
+                ))
+
 
         def draw_unique_component_bboxes(image, bounding_boxes):
             """
@@ -1991,20 +2033,30 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
 
         df_connections = pd.DataFrame(records_new, columns=[
             "wire_no", "source_component", "source_terminal",
-            "dest_component", "dest_terminal"
+            "dest_component", "dest_terminal",
+            "source_point", "dest_point"   # <-- new columns
         ])
-        # df_connections= df_connections.drop_duplicates()
+
         df_connections = df_connections.replace("", pd.NA)
+
+        # Drop rows where all these columns are empty
         df_connections = df_connections.dropna(
             subset=["source_component", "source_terminal", "dest_component", "dest_terminal"],
             how="all"
         )
+
+        # Reset index_no for the filtered rows
+        df_connections["index_no"] = df_connections.index + 1
+
+        # Assign diagram type
         df_connections["type"] = "Power Line Diagram" if detected_class_name == '0' else "Control Line Diagram"
 
-        # print("Step 5: Drawing connections from DataFrame")
-        drawn_lines_lst = draw_connections_from_df(
-            wire_df=df_wire,
+        # Now draw images
+        drawn_lines_lst = draw_connections_from_df_connections(
+            df_connections=df_connections,
             img=cropped_img,
         )
+
+
 
     return df_wire, df_connections, combined_canvas, cropped_with_junctions, line_canvas, drawn_lines_lst

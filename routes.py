@@ -301,8 +301,8 @@ def analyze_circuit():
             })
 
             if drawn_lines_lst:
-                for i, (wire_name, line_img) in enumerate(drawn_lines_lst):
-                    all_drawn_lines.append((page, wire_name, i, line_img))
+                for i, (wire_name, display_name, line_img) in enumerate(drawn_lines_lst):
+                    all_drawn_lines.append((page, wire_name, display_name, i, line_img))
 
         df_wire = pd.concat(all_wires, ignore_index=True) if all_wires else pd.DataFrame()
         df_connections = pd.concat(all_connections, ignore_index=True) if all_connections else pd.DataFrame()
@@ -334,14 +334,15 @@ def analyze_circuit():
             })
 
         drawn_lines_output = []
-        for page, wire_name, i, line_img in all_drawn_lines:
+        for page, wire_name, display_name, i, line_img in all_drawn_lines:
             filename = secure_filename(f"{file_stem}_p{page}_{wire_name}.png")
             url = save_img(line_img, filename)
             drawn_lines_output.append({
                 "page": page,
+                "display_name": display_name,
                 "id": i + 1,
                 "name": wire_name,
-                "image_url": url
+                "image_url": url,
             })
 
         result = {

@@ -1046,6 +1046,7 @@
         function populateConnectionTable(data) {
             console.log('Populating connection table with data:', data);
             const columnOrder = [
+                "index_no",
                 "source_component",
                 "source_terminal",
                 "dest_component",
@@ -1114,10 +1115,10 @@
 
                 // ✅ Use pdf_name internally but don't display it
                 tr.addEventListener('click', () => {
-                    const wireNo = row["wire_no"];
                     const pageNum = row["page_number"];
+                    const index_no = row["index_no"];
                     const fileName = row["pdf_name"] || pdfFileName;
-                    const imageName = `${fileName}_p${pageNum}_Wire_${wireNo}.png`;
+                    const imageName = `${fileName}_p${pageNum}_${index_no-1}.png`;
 
                     const imgIndex = currentDisplayedImages.findIndex(img => {
                         const currentFileName = img.image_url.split('/').pop();
@@ -1265,7 +1266,7 @@
                 imageDiv.className = 'grid-image';
                 imageDiv.innerHTML = `
                     <img src="${imgData.image_url}" alt="${imgData.name}" />
-                    <div class="grid-image-info">${imgData.name}</div>
+                    <div class="grid-image-info">${imgData.display_name}</div>
                 `;
 
                 imageDiv.addEventListener('click', () => openOverlay(i, imgData));
@@ -1317,8 +1318,8 @@
             const overlayInfo = document.getElementById('overlay-info');
 
             overlayImage.src = imageData.image_url;
-            overlayImage.alt = imageData.name;
-            overlayInfo.textContent = imageData.name;
+            overlayImage.alt = imageData.display_name;
+            overlayInfo.textContent = imageData.display_name;
             
             overlay.classList.add('active');
             document.body.style.overflow = 'hidden'; // Prevent background scrolling
@@ -1343,8 +1344,8 @@
                 const overlayInfo = document.getElementById('overlay-info');
                 
                 overlayImage.src = imageData.image_url;
-                overlayImage.alt = imageData.name;
-                overlayInfo.textContent = imageData.name;
+                overlayImage.alt = imageData.display_name;
+                overlayInfo.textContent = imageData.display_name;
                 
                 updateOverlayNavigation();
             }
