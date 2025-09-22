@@ -1989,7 +1989,9 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                     continue
                 if source_component and dest_component and "sensor" in source_component.lower() and "breaker" in dest_component.lower():
                     continue
-                
+
+                if source_component and dest_component and "multi" in source_component.lower() and "shield" in dest_component.lower():
+                    continue
                 # Append coordinates too
                 records_new.append((
                     wire_no,
@@ -2050,6 +2052,9 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
 
         # Assign diagram type
         df_connections["type"] = "Power Line Diagram" if detected_class_name == '0' else "Control Line Diagram"
+
+        df_connections = df_connections.drop_duplicates(subset=["source_component", "source_terminal",
+            "dest_component", "dest_terminal"], keep="last")
 
         # Now draw images
         drawn_lines_lst = draw_connections_from_df_connections(

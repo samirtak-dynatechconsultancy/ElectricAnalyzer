@@ -168,10 +168,14 @@ def draw_connections_from_df(wire_df, img):
     return images_list
 
 
+
+import cv2
+import numpy as np
+
 def draw_connections_from_df_connections(df_connections, img):
     images_list = []
 
-    for _, row in df_connections.iterrows():
+    for idx, row in df_connections.iterrows():
         src_point = row.get('source_point')
         src_component = row.get('source_component', 'Unknown Source')
         src_terminal = row.get('source_terminal', 'Unknown Term')
@@ -180,21 +184,52 @@ def draw_connections_from_df_connections(df_connections, img):
         dst_terminal = row.get('dest_terminal', 'Unknown Term')
         wire_no = row.get('wire_no', 'Unknown Wire')
 
-        # Skip if coordinates are missing
-        # if src_point is None or dst_point is None:
-        #     continue
+        if src_point is None or dst_point is None:
+            continue
 
-        # Copy the original image for this connection
         copy_img = img.copy()
 
-        # Draw source/destination dots
+        # Draw endpoints
         cv2.circle(copy_img, tuple(src_point), 6, (0, 140, 255), -1)
         cv2.circle(copy_img, tuple(dst_point), 6, (0, 140, 255), -1)
 
-        # Draw line between them
+        # Draw base line
         cv2.line(copy_img, tuple(src_point), tuple(dst_point), (0, 0, 255), 2)
 
-        # Add to list with wire name
-        images_list.append((f"{_}", f"{src_component}.{src_terminal}->{dst_component}.{dst_terminal}",copy_img))
+        # Compute direction vector
+        p1 = np.array(src_point, dtype=float)
+        p2 = np.array(dst_point, dtype=float)
+        direction = p2 - p1
+        length = np.linalg.norm(direction)
+
+        if length < 10:  # too short to draw arrows
+            continue
+
+        direction /= length  # unit vector
+        normal = np.array([-direction[1], direction[0]])  # perpendicular for triangle width
+
+        # Parameters for triangles
+        spacing = length/3 if length > 150 else length/2
+        # spacing = 100         # space between triangles
+        size = 25             # triangle size
+
+        # Compute number of triangles
+        num_arrows = int(length // spacing)
+        for i in range(1, num_arrows + 1):
+            center = p1 + direction * (i * spacing)
+
+            # Triangle points
+            tip = center + direction * size
+            base_left = center - direction * size * 0.5 + normal * size * 0.6
+            base_right = center - direction * size * 0.5 - normal * size * 0.6
+
+            pts = np.array([tip, base_left, base_right], np.int32)
+            cv2.fillConvexPoly(copy_img, pts, (0, 0, 255))
+
+        images_list.append((
+            f"{idx}",
+            f"{src_component}.{src_terminal} -> {dst_component}.{dst_terminal}",
+            copy_img
+        ))
 
     return images_list
