@@ -8,3 +8,5 @@ uploads/
 venv
 venv_new
 results
+*.pdf
+*.png
