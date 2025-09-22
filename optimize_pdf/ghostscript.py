@@ -1,6 +1,6 @@
 import subprocess
 import os
-
+import platform
 def optimize_pdf(input_pdf, output_pdf, quality="screen"):
     """
     Optimize and clean a PDF file using Ghostscript.
@@ -15,13 +15,16 @@ def optimize_pdf(input_pdf, output_pdf, quality="screen"):
                        - prepress: high quality, larger file
                        - default: standard optimization
     """
-    gs_path = r"C:\Program Files\gs\gs10.06.0\bin\gswin64c.exe"
+
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_pdf), exist_ok=True)
-
+    if platform.system() == 'Windows':
+        gs_cmd = "gswin64c"
+    else:
+        gs_cmd = "gs"
     # Ghostscript command
     command = [
-        "gswin64c.exe",
+        gs_cmd,
         "-sDEVICE=pdfwrite",
         "-dCompatibilityLevel=1.4",
         "-dPDFSETTINGS=/" + quality,
