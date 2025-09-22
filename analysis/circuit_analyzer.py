@@ -193,8 +193,8 @@ def extract_shx_and_text(pdf_name, page_num, output_path=None):
                     cv2.rectangle(img_cv, (sx1, sy1), (sx2, sy2), (255, 0, 0), 2)
                     cv2.putText(img_cv, span["text"], (sx1, sy1 - 5),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-    if output_path:
-        cv2.imwrite(output_path, img_cv)
+    # if output_path:
+    #     cv2.imwrite(output_path, img_cv)
 
     return all_boxes, method_name
 
@@ -203,7 +203,7 @@ def redact_image_by_boxes(image, boxes, fill_color=(255,255,255), shrink=2):
     boxes_sorted = sorted(boxes, key=lambda b: (b[2]-b[0])*(b[3]-b[1]), reverse=True)
     for (x1, y1, x2, y2, text, conf) in boxes_sorted:
         cv2.rectangle(out, (x1, y1), (x2, y2), fill_color, thickness=-1)
-    cv2.imwrite("redacted.png", out)
+    # cv2.imwrite("redacted.png", out)
     return out
 
 def find_wire_endpoint_connections(all_wires, threshold=WIRE_CONNECTION_THRESHOLD):
@@ -1617,7 +1617,7 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
         2,
         cv2.LINE_AA
     )
-    cv2.imwrite("bnd_test.png", debug_img)
+    # cv2.imwrite("bnd_test.png", debug_img)
 
     # --- Map to PDF coordinate space ---
     x1_pdf, y1_pdf, x2_pdf, y2_pdf = [coord / zoom for coord in [x1, y1, x2, y2]]
@@ -1630,7 +1630,7 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
     cropped_pix = fitz_page.get_pixmap(matrix=mat)
     cropped_img_cv = np.frombuffer(cropped_pix.samples, dtype=np.uint8).reshape(cropped_pix.height, cropped_pix.width, cropped_pix.n)
 
-    cv2.imwrite("DETECTED.png", cropped_img_cv)
+    # cv2.imwrite("DETECTED.png", cropped_img_cv)
 
     return fitz_page, cropped_img_cv, detected_class_name
 
@@ -1987,7 +1987,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             return image
         img_with_boxes = draw_unique_component_bboxes(cropped_img, bounding_boxes)
 
-        cv2.imwrite("components_labeled.png", img_with_boxes)  # save
+        # cv2.imwrite("components_labeled.png", img_with_boxes)  # save
 
         df_connections = pd.DataFrame(records_new, columns=[
             "wire_no", "source_component", "source_terminal",
