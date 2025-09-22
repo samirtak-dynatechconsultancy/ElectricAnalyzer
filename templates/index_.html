@@ -1117,8 +1117,12 @@
                     const wireNo = row["wire_no"];
                     const pageNum = row["page_number"];
                     const fileName = row["pdf_name"] || pdfFileName;
-                    const imageName = `/results/${fileName}_p${pageNum}_Wire_${wireNo}.png`;
-                    const imgIndex = currentDisplayedImages.findIndex(img => img.image_url === imageName);
+                    const imageName = `${fileName}_p${pageNum}_Wire_${wireNo}.png`;
+
+                    const imgIndex = currentDisplayedImages.findIndex(img => {
+                        const currentFileName = img.image_url.split('/').pop();
+                        return currentFileName === imageName;
+                    });
 
                     if (imgIndex !== -1) {
                         openOverlay(imgIndex, currentDisplayedImages[imgIndex]);
@@ -1241,7 +1245,7 @@
             grid.innerHTML = '';
             const currentPageNum = pageKeys[pageIndex];
             const images = groupedImages[currentPageNum];
-            let imagesPerPage = 10;
+            let imagesPerPage = images.length;
             const totalImagePages = Math.ceil(images.length / imagesPerPage);
 
             const startIndex = (imagePage - 1) * imagesPerPage;
