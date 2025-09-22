@@ -1990,7 +1990,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 if source_component and dest_component and "sensor" in source_component.lower() and "breaker" in dest_component.lower():
                     continue
 
-                if source_component and dest_component and "multi" in source_component.lower() and "shield" in dest_component.lower():
+                if source_component and dest_component and "multi" in source_component.lower() and "sheild" in dest_component.lower():
                     continue
                 # Append coordinates too
                 records_new.append((
