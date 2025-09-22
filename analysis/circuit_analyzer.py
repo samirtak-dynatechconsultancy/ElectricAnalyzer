@@ -1539,7 +1539,6 @@ def find_closest_text(component, point, text_boxes):
                     continue
                 is_valid = is_valid_text(text)
                 if is_circuit:
-                    print(text)
                     is_valid = is_numeric(text)
                 all_checked_texts.append((dist, text, is_valid, "general"))
 
@@ -1597,7 +1596,6 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
     area_ratio = box_area / image_area
 
     if area_ratio < 0.5:
-        print(f"⚠️ Detected box area ({area_ratio:.2%}) < 50%, ignoring.")
         return fitz_page, img_cv, None
 
     detected_class_name = names[class_id]

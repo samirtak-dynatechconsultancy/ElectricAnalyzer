@@ -155,13 +155,7 @@ def add_white_box():
         
         page_rect = page.rect
         original_rotation = page.rotation
-        
-        print(f"=== DEBUG INFO ===")
-        print(f"Original coordinates from frontend: x={x}, y={y}, width={width}, height={height}")
-        print(f"Page rect: {page_rect}")
-        print(f"Page dimensions: {page_rect.width} x {page_rect.height}")
-        print(f"Page rotation: {original_rotation}")
-        
+                
         pdf_x1 = x - width/2
         pdf_y1 = y - height/2
         pdf_x2 = x + width/2
@@ -170,13 +164,7 @@ def add_white_box():
         pdf_x1, pdf_x2 = min(pdf_x1, pdf_x2), max(pdf_x1, pdf_x2)
         pdf_y1, pdf_y2 = min(pdf_y1, pdf_y2), max(pdf_y1, pdf_y2)
         
-        print(f"Converted PDF coordinates: x1={pdf_x1}, y1={pdf_y1}, x2={pdf_x2}, y2={pdf_y2}")
-        
-        if pdf_x1 < 0 or pdf_y1 < 0 or pdf_x2 > page_rect.width or pdf_y2 > page_rect.height:
-            print(f"WARNING: Coordinates outside page bounds!")
-        
         rect = fitz.Rect(pdf_x1, pdf_y1, pdf_x2, pdf_y2)
-        print(f"Final rectangle: {rect}")
         
         # Add white rectangle annotation
         annot = page.add_rect_annot(rect)
@@ -196,10 +184,6 @@ def add_white_box():
             color=(0, 0, 0)       # Black text
         )
         
-        print(f"Added text '{label_text}' at {text_rect}")
-
-        # Save modified PDF
-        print(f"Saving modified PDF to {filepath}")
         doc.save(filepath, incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
         doc.close()
         
@@ -336,7 +320,6 @@ def analyze_circuit():
 
             full_path = os.path.join(user_folder, filename)
             
-            print("THIS IS full_path:", full_path)
             cv2.imwrite(full_path, img)
             return f"/results/{session.get('id', 'guest')}/{filename}"
 
@@ -369,7 +352,6 @@ def analyze_circuit():
         }
 
         ed = time.time()
-        print("Result prepared successfully")
         print("TOTAL TIME", ed - st)
         return jsonify({
             "success": True,
@@ -558,7 +540,6 @@ def home():
 
     if 'user_email' in session:
         user = get_user_by_email(session['user_email'])
-        print(user)
         return render_template('index_.html', user=user)
     return render_template('index.html')
 
