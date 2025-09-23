@@ -147,8 +147,8 @@ def add_white_box():
         # Increment counter for this page
         box_counter[filename][page_num] += 1
         current_id = box_counter[filename][page_num]
-        label_text = f"Φ{current_id}"  # e.g. Φ1, Φ2, Φ3
-        
+        label_text = f"Terminal {current_id}"  # e.g. Terminal 1, Terminal 2, Terminal 3
+
         # Open PDF
         doc = fitz.open(filepath)
         page = doc[page_num]

@@ -214,9 +214,16 @@ def draw_connections_from_df_connections(df_connections, img):
         size = 25             # triangle size
 
         # Compute number of triangles
-        num_arrows = int(length // spacing)
+        # Margin from endpoints to avoid arrows at endpoints
+        margin = size * 1.5
+        effective_length = length - 2 * margin
+        if effective_length <= 0:
+            continue
+
+        num_arrows = int(effective_length // spacing)
         for i in range(1, num_arrows + 1):
-            center = p1 + direction * (i * spacing)
+            # Center shifted by margin
+            center = p1 + direction * (margin + i * spacing)
 
             # Triangle points
             tip = center + direction * size
@@ -225,6 +232,7 @@ def draw_connections_from_df_connections(df_connections, img):
 
             pts = np.array([tip, base_left, base_right], np.int32)
             cv2.fillConvexPoly(copy_img, pts, (0, 0, 255))
+
 
         images_list.append((
             f"{idx}",

@@ -19,10 +19,10 @@ from ultralytics import YOLO
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Build the absolute path to your model
-TYPE_1_BEST_MODEL_PATH = os.path.join(BASE_DIR, "models", "type_1_best.pt")
+TYPE_1_BEST_MODEL_PATH = os.path.join(BASE_DIR, "models", "type-1-best.pt")
 TYPE_1_BEST_MODEL = YOLO(TYPE_1_BEST_MODEL_PATH)
 
-TYPE_2_BEST_MODEL_PATH = os.path.join(BASE_DIR, "models", "type_2_best.pt")
+TYPE_2_BEST_MODEL_PATH = os.path.join(BASE_DIR, "models", "type-2-best.pt")
 TYPE_2_BEST_MODEL = YOLO(TYPE_2_BEST_MODEL_PATH)
 
 CLASSIFICATION_BEST_MODEL_PATH = os.path.join(BASE_DIR, "models", "classification_best.pt")
@@ -1654,7 +1654,6 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
     cropped_img_cv = np.frombuffer(cropped_pix.samples, dtype=np.uint8).reshape(cropped_pix.height, cropped_pix.width, cropped_pix.n)
 
     # cv2.imwrite("DETECTED.png", cropped_img_cv)
-    print(fitz_page, cropped_img_cv, detected_class_name, x,y,w,h)
     return fitz_page, cropped_img_cv, detected_class_name, x,y,w,h
 
 
@@ -1698,7 +1697,6 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     else:  # 3 channels -> RGB
         cropped_img = cv2.cvtColor(cropped_img, cv2.COLOR_RGB2BGR)
 
-    print(f"Detected main object: {detected_class_name}")
     bounding_boxes = []
     if detected_class_name == '0':
         results = TYPE_1_BEST_MODEL.predict(
@@ -1724,7 +1722,8 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             xyxy = box.xyxy.cpu().numpy()[0]  # [xmin, ymin, xmax, ymax]
             cls_id = int(box.cls.cpu().numpy()[0])
             class_name = result.names[cls_id]
-
+            if 'drawout' in class_name.lower():
+                continue
             # Cast to native Python float
             xmin, ymin, xmax, ymax = [int(v) for v in xyxy]
 
@@ -1979,6 +1978,10 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             source_component = find_component_with_id(source_point, bounding_boxes)
             source_terminal = find_closest_text(source_component, source_point, boxes)
 
+            if source_terminal and 'terminal' in source_terminal.lower():
+                source_component = 'Terminal'
+                source_terminal = source_terminal.replace('Terminal', '').strip() 
+
             for target_point in sorted_points[1:]:
                 dest_component = find_component_with_id(target_point, bounding_boxes)
                 dest_terminal = find_closest_text(dest_component, target_point, boxes)
@@ -1992,6 +1995,11 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
 
                 if source_component and dest_component and "multi" in source_component.lower() and "sheild" in dest_component.lower():
                     continue
+
+                if dest_terminal and 'terminal' in dest_terminal.lower():
+                    dest_component = 'Terminal'
+                    dest_terminal = dest_terminal.replace('Terminal_', '').strip() 
+
                 # Append coordinates too
                 records_new.append((
                     wire_no,
@@ -2003,33 +2011,6 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                     target_point 
                 ))
 
-
-        def draw_unique_component_bboxes(image, bounding_boxes):
-            """
-            Draw unique component bounding boxes with IDs on the given cv2 image.
-            bounding_boxes: list of (x1, y1, x2, y2, component_name)
-            """
-            for (x1, y1, x2, y2, component_name) in bounding_boxes:
-                bbox_coords = (x1, y1, x2, y2)
-                unique_id = get_unique_component_id(component_name, bbox_coords)
-
-                # Draw rectangle
-                
-                cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-                # Put text (ID)
-                cv2.putText(
-                    image,
-                    unique_id,
-                    (x1, y1 - 5),  # just above the box
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 0, 255),  # red text
-                    1,
-                    cv2.LINE_AA
-                )
-            return image
-        img_with_boxes = draw_unique_component_bboxes(cropped_img, bounding_boxes)
 
         # cv2.imwrite("components_labeled.png", img_with_boxes)  # save
 

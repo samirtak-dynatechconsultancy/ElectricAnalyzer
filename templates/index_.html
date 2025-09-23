@@ -205,7 +205,7 @@
 
         <!-- Overlay for image popup -->
         <div class="overlay" id="image-overlay">
-            <div class="overlay-content">
+            <div class="overlay-content" id="overlay-content">
                 <button class="close-btn" onclick="closeOverlay()">&times;</button>
                 <button class="nav-arrow prev" id="prev-overlay" onclick="navigateOverlay(-1)">&#8249;</button>
                 <img class="overlay-image" id="overlay-image" src="" alt="">
@@ -1207,6 +1207,7 @@ function ensureCanvasContainerSize() {
                 const rightBtn = document.createElement('button');
                 rightBtn.textContent = "Right";
                 rightBtn.className = "btn-right";
+                rightBtn.id = `right-btn-${row["index_no"]}`; // add unique id
                 rightBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     tr.classList.remove('row-wrong');
@@ -1217,6 +1218,7 @@ function ensureCanvasContainerSize() {
                 const wrongBtn = document.createElement('button');
                 wrongBtn.textContent = "Wrong";
                 wrongBtn.className = "btn-wrong";
+                wrongBtn.id = `wrong-btn-${row["index_no"]}`; // add unique id
                 wrongBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     tr.classList.remove('row-right');
@@ -1384,6 +1386,82 @@ function ensureCanvasContainerSize() {
             }
         }
 
+        function markRow(rowIndex, mark) {
+            // Ensure rowIndex is treated as a number
+            const numericIndex = Number(rowIndex);
+            if (isNaN(numericIndex)) {
+                console.warn(`Invalid rowIndex "${rowIndex}" passed to markRow.`);
+                return;
+            }
+
+            const adjustedIndex = numericIndex + 1; // add 1 safely
+            const normalizedMark = mark.toLowerCase();
+
+            let btnId = null;
+            if (normalizedMark === 'right') {
+                btnId = `right-btn-${adjustedIndex}`;
+            } else if (normalizedMark === 'wrong') {
+                btnId = `wrong-btn-${adjustedIndex}`;
+            }
+
+            if (btnId) {
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    btn.click(); // programmatically trigger click
+                } else {
+                    console.warn(`Button with ID "${btnId}" not found.`);
+                }
+            } else {
+                console.warn(`Invalid mark "${mark}" passed to markRow.`);
+            }
+        }
+
+        function handleEnterKey(e, imageData) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+
+                if (e.shiftKey) {
+                    // Shift+Enter was pressed
+                    markRow(imageData.name, 'Wrong'); 
+                } else {
+                    // Regular Enter was pressed
+                    markRow(imageData.name, 'Right');
+                }
+            }
+        }
+
+        let keydownHandler; // store handler so we can remove it later
+        
+        function showStatusOverlay(btnElement) {
+            if (!btnElement) return;
+
+            const overlayContent = document.getElementById('overlay-content');
+
+            // Remove any previous status div if it exists
+            const existingStatus = overlayContent.querySelector('.status-overlay');
+            if (existingStatus) {
+                existingStatus.remove();
+            }
+
+            const parentClass = btnElement.parentElement.parentElement.className;
+            let statusDiv = document.createElement('div');
+            statusDiv.className = 'status-overlay close-btn'; // reuse close-btn styling if needed
+            statusDiv.style.cssText = 'right: inherit; color: black; width: fit-content; border-radius: 20%; padding: 6px;';
+
+            if (parentClass.includes('row-right')) {
+                statusDiv.style.background = 'lightgreen';
+                statusDiv.textContent = 'Correct';
+            } else if (parentClass.includes('row-wrong')) {
+                statusDiv.style.background = 'lightcoral';
+                statusDiv.textContent = 'Incorrect';
+            } else {
+                btnElement.parentElement.parentElement.className = '';
+                return; // nothing to show
+            }
+
+            overlayContent.appendChild(statusDiv);
+        }
+
         function openOverlay(index, imageData) {
             currentOverlayIndex = index;
             const overlay = document.getElementById('image-overlay');
@@ -1392,45 +1470,88 @@ function ensureCanvasContainerSize() {
 
             overlayImage.src = imageData.image_url;
             overlayImage.alt = imageData.display_name;
+            overlayImage.dataset.index = imageData.index_no;
             overlayInfo.textContent = imageData.display_name;
-            
+
             overlay.classList.add('active');
-            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            document.body.style.overflow = 'hidden';
             
+            const numericIndex = Number(imageData.name);
+            const adjustedIndex = numericIndex + 1; // add 1 safely
+        
+            btnId = `right-btn-${adjustedIndex}`;
+
+            const btnElement = document.getElementById(btnId);
+            showStatusOverlay(btnElement);
             updateOverlayNavigation();
+
+            // Bind Enter key for this image
+            bindEnterKey(imageData);
         }
 
         function closeOverlay() {
             const overlay = document.getElementById('image-overlay');
             overlay.classList.remove('active');
-            document.body.style.overflow = ''; // Restore scrolling
+            document.body.style.overflow = '';
+
+            unbindEnterKey();
         }
+
 
         function navigateOverlay(direction) {
             const newIndex = currentOverlayIndex + direction;
-            
+
             if (newIndex >= 0 && newIndex < currentDisplayedImages.length) {
                 currentOverlayIndex = newIndex;
                 const imageData = currentDisplayedImages[currentOverlayIndex];
-                
+
                 const overlayImage = document.getElementById('overlay-image');
                 const overlayInfo = document.getElementById('overlay-info');
-                
+
                 overlayImage.src = imageData.image_url;
                 overlayImage.alt = imageData.display_name;
+                overlayImage.dataset.index = imageData.index_no;
                 overlayInfo.textContent = imageData.display_name;
-                
+
+                const numericIndex = Number(imageData.name);
+                const adjustedIndex = numericIndex + 1; // add 1 safely
+            
+                btnId = `right-btn-${adjustedIndex}`;
+
+                const btnElement = document.getElementById(btnId);
+                showStatusOverlay(btnElement);
+
                 updateOverlayNavigation();
+
+                // Rebind Enter key handler for new image
+                bindEnterKey(imageData);
+            }
+        }
+
+        function bindEnterKey(imageData) {
+            // Unbind old handler first
+            unbindEnterKey();
+
+            keydownHandler = (e) => handleEnterKey(e, imageData);
+            document.addEventListener('keydown', keydownHandler);
+        }
+
+        
+        function unbindEnterKey() {
+            if (keydownHandler) {
+                document.removeEventListener('keydown', keydownHandler);
+                keydownHandler = null;
             }
         }
 
         function updateOverlayNavigation() {
             const prevBtn = document.getElementById('prev-overlay');
             const nextBtn = document.getElementById('next-overlay');
-            
+
             prevBtn.disabled = currentOverlayIndex === 0;
             nextBtn.disabled = currentOverlayIndex === currentDisplayedImages.length - 1;
         }
+
 
         // Close overlay when clicking outside the image
         document.getElementById('image-overlay').addEventListener('click', function(e) {
@@ -1439,7 +1560,7 @@ function ensureCanvasContainerSize() {
             }
         });
 
-        // Close overlay with Escape key
+        // Global listener for Esc and Arrow navigation
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeOverlay();
@@ -1449,6 +1570,7 @@ function ensureCanvasContainerSize() {
                 navigateOverlay(1);
             }
         });
+
 
         // Change page
         function changePage(direction) {
