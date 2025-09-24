@@ -2087,6 +2087,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 **Absolute Rules - DO NOT DEVIATE:**
                 1.  **No Sequential Inference:** You MUST IGNORE any perceived numerical or alphabetical order. Component labels in schematics are not always sequential. The first current transformer (CT) component you see could be labeled 'CT3', and the next could be 'CT1'. This is normal and correct.
                 2.  **No "Correcting":** Do not change a label to fit a sequence. If the label in the image is clearly 'CT3', its logical name is 'CT3'. This is not an error to be fixed.
+                2.1. **Switch Components:** If the system analyzes a component in the diagram that is clearly labeled "S3", its logical_name becomes "S3". The system will not "correct" it to "S1" just because it's the first one it found.
                 3.  **Visual Evidence Only:** Rely strictly on the text that is visibly printed in the image. Do not hallucinate or guess names.
 
                 Return the results as a JSON dictionary with 'unique_id' as the key and 'logical_name' as the value.
