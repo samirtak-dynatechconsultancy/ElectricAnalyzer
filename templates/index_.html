@@ -69,7 +69,7 @@
 
                 <div class="selection-controls" id="selection-controls">
                     <div class="selection-row">
-                        <button class="clear-selection-btn" onclick="clearSelection()">
+                        <button class="clear-selection-btn" id="clear-selection-btn" onclick="clearSelection()">
                             🗑️ Clear
                         </button>
                     </div>
@@ -140,15 +140,31 @@
             <div class="table-container">
                 <div class="table-header">
                     <div class="table-title">Connection Analysis Data</div>
+
+                    <button class="download-btn" id="save-btn" onclick="saveToDatabase('connection-data')">
+                        📥 Save to Database
+                    </button>
+
+                    <div class="toast-custom-container" id="toast-custom-container"></div>
+
                     <button class="download-btn" onclick="downloadCSV('connection-data')">
                         📥 Download CSV
                     </button>
                 </div>
+
                 <div class="table-wrapper">
                     <table id="connection-table">
                         <thead id="connection-thead"></thead>
                         <tbody id="connection-tbody"></tbody>
                     </table>
+                </div>
+            </div>
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">Connection Pairs</div>
+                    <button class="download-btn" onclick="downloadCSV('connection-pairs')">
+                        📥 Download CSV
+                    </button>
                 </div>
             </div>
         </div>
@@ -1072,7 +1088,6 @@ function ensureCanvasContainerSize() {
             submitBtn.innerHTML = '<div class="loading"></div> Analyzing...';
             statusDiv.textContent = "⏳ Uploading and analyzing...";
             statusDiv.className = "status-info";
-
             // Note: This will fail in the demo as there's no backend
             fetch('/analyze', {
                 method: 'POST',
@@ -1153,6 +1168,11 @@ function ensureCanvasContainerSize() {
                     th.textContent = key.replace('_', ' ').toUpperCase();
                     headerRow.appendChild(th);
                 }
+                if (key === "index_no") {
+                    const previewTh = document.createElement('th');
+                    previewTh.textContent = "PREVIEW";
+                    headerRow.appendChild(previewTh);
+                }
             });
             headerRow.appendChild(document.createElement('th')); // for action buttons
             thead.appendChild(headerRow);
@@ -1160,27 +1180,69 @@ function ensureCanvasContainerSize() {
             // ✅ Create rows (skip pdf_name and selected when rendering)
             data.forEach((row, rowIndex) => {
                 const tr = document.createElement('tr');
+                tr.id = `index-${row['index_no']}-page-${row['page_number']}`;
                 Object.entries(row).forEach(([key, value]) => {
                     if (key !== "selected" && key !== "pdf_name") {
                         const td = document.createElement('td');
 
                         if (key === "reason") {
-                            const input = document.createElement('input');
-                            input.type = "text";
-                            input.value = value;
-                            input.placeholder = "Enter reason";
-                            input.addEventListener('input', (e) => {
+                            const textarea = document.createElement('textarea');
+                            textarea.value = value;
+                            textarea.placeholder = "Enter reason";
+                            textarea.rows = 3; // Adjust number of visible lines
+                            textarea.style.width = "100%"; // Make it full width
+                            textarea.addEventListener('input', (e) => {
                                 data[rowIndex].reason = e.target.value;
                             });
-                            input.addEventListener('click', (e) => e.stopPropagation());
-                            td.appendChild(input);
-                        } else {
+                            textarea.addEventListener('click', (e) => e.stopPropagation());
+                            td.appendChild(textarea);
+                        } else if (key === "index_no") {
+                            // Non-editable index_no
                             td.textContent = value;
+                            tr.appendChild(td);
+
+                            // ✅ Add Preview button right after index_no
+                            const previewTd = document.createElement('td');
+                            const previewBtn = document.createElement('button');
+                            previewBtn.textContent = "Preview";
+                            previewBtn.className = "btn-preview";
+                            previewBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const pageNum = row["page_number"];
+                                const index_no = row["index_no"];
+                                const fileName = row["pdf_name"] || pdfFileName;
+                                const imageName = `${fileName}_p${pageNum}_${index_no-1}.png`;
+
+                                const imgIndex = currentDisplayedImages.findIndex(img => {
+                                    const currentFileName = img.image_url.split('/').pop();
+                                    return currentFileName === imageName;
+                                });
+
+                                if (imgIndex !== -1) {
+                                    openOverlay(imgIndex, currentDisplayedImages[imgIndex]);
+                                } else {
+                                    console.warn(`No image found for ${imageName} in currentDisplayedImages`);
+                                }
+                            });
+                            previewTd.appendChild(previewBtn);
+                            tr.appendChild(previewTd);
+
+                            return; // skip the rest of the loop for index_no
+                        } else if (["wire_no", "page_number"].includes(key)) {
+                            td.textContent = value;
+                        } else {
+                            td.contentEditable = true;
+                            td.textContent = value;
+                            td.addEventListener('input', () => {
+                                data[rowIndex][key] = td.textContent;
+                            });
+                            td.addEventListener('click', (e) => e.stopPropagation());
                         }
 
                         tr.appendChild(td);
                     }
                 });
+
 
                 // ✅ Use pdf_name internally but don't display it
                 tr.addEventListener('click', () => {
@@ -1203,7 +1265,7 @@ function ensureCanvasContainerSize() {
 
                 // Action buttons
                 const actionTd = document.createElement('td');
-
+                actionTd.style.display = 'flex';
                 const rightBtn = document.createElement('button');
                 rightBtn.textContent = "Right";
                 rightBtn.className = "btn-right";
@@ -1408,6 +1470,7 @@ function ensureCanvasContainerSize() {
                 const btn = document.getElementById(btnId);
                 if (btn) {
                     btn.click(); // programmatically trigger click
+                    showStatusOverlay(btn)
                 } else {
                     console.warn(`Button with ID "${btnId}" not found.`);
                 }
@@ -1446,7 +1509,7 @@ function ensureCanvasContainerSize() {
             const parentClass = btnElement.parentElement.parentElement.className;
             let statusDiv = document.createElement('div');
             statusDiv.className = 'status-overlay close-btn'; // reuse close-btn styling if needed
-            statusDiv.style.cssText = 'right: inherit; color: black; width: fit-content; border-radius: 20%; padding: 6px;';
+            statusDiv.style.cssText = 'left: 100px; color: black; width: fit-content; border-radius: 20%; padding: 6px;';
 
             if (parentClass.includes('row-right')) {
                 statusDiv.style.background = 'lightgreen';
@@ -1471,7 +1534,6 @@ function ensureCanvasContainerSize() {
             overlayImage.src = imageData.image_url;
             overlayImage.alt = imageData.display_name;
             overlayImage.dataset.index = imageData.index_no;
-            overlayInfo.textContent = imageData.display_name;
 
             overlay.classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -1482,6 +1544,14 @@ function ensureCanvasContainerSize() {
             btnId = `right-btn-${adjustedIndex}`;
 
             const btnElement = document.getElementById(btnId);
+            let tr = btnElement.parentElement.parentElement;  // gets the <tr> element
+            let tds = tr.querySelectorAll("td");              // all <td> elements in that row
+
+            function safeText(td) {
+            return td.textContent.trim() === "" ? "<N.A>" : td.textContent.trim();
+            }
+
+            overlayInfo.textContent = `${safeText(tds[2])}.${safeText(tds[3])} → ${safeText(tds[4])}.${safeText(tds[5])}`;
             showStatusOverlay(btnElement);
             updateOverlayNavigation();
 
@@ -1493,6 +1563,28 @@ function ensureCanvasContainerSize() {
             const overlay = document.getElementById('image-overlay');
             overlay.classList.remove('active');
             document.body.style.overflow = '';
+
+            const src = document.getElementById('overlay-image').src;
+            const filename = src.split('/').pop(); // "200_BSUPSB-0107_optimized_p8_77.png"
+
+            // Regex to find the number after 'p' and the last number in filename
+            const match = filename.match(/p(\d+).*_(\d+)\.png$/);
+
+            if (match) {
+                const pNumber = parseInt(match[1], 10); // "8"
+                const lastNumber = parseInt(match[2], 10); // "77"
+                console.log(pNumber, lastNumber);
+
+                const tableRowToHighlight = document.getElementById(`index-${lastNumber+1}-page-${pNumber}`);
+                if (tableRowToHighlight) {
+                    tableRowToHighlight.classList.add('custom-highlight');
+
+                    // Remove highlight after 2 seconds (2000 ms)
+                    setTimeout(() => {
+                        tableRowToHighlight.classList.remove('custom-highlight');
+                    }, 3000);
+                }
+            }
 
             unbindEnterKey();
         }
@@ -1511,7 +1603,6 @@ function ensureCanvasContainerSize() {
                 overlayImage.src = imageData.image_url;
                 overlayImage.alt = imageData.display_name;
                 overlayImage.dataset.index = imageData.index_no;
-                overlayInfo.textContent = imageData.display_name;
 
                 const numericIndex = Number(imageData.name);
                 const adjustedIndex = numericIndex + 1; // add 1 safely
@@ -1519,6 +1610,15 @@ function ensureCanvasContainerSize() {
                 btnId = `right-btn-${adjustedIndex}`;
 
                 const btnElement = document.getElementById(btnId);
+                let tr = btnElement.parentElement.parentElement;  // gets the <tr> element
+                let tds = tr.querySelectorAll("td");              // all <td> elements in that row
+
+                function safeText(td) {
+                    return td.textContent.trim() === "" ? "<N.A>" : td.textContent.trim();
+                }
+
+                overlayInfo.textContent = `${safeText(tds[2])}.${safeText(tds[3])} → ${safeText(tds[4])}.${safeText(tds[5])}`;
+
                 showStatusOverlay(btnElement);
 
                 updateOverlayNavigation();
@@ -1600,6 +1700,55 @@ function ensureCanvasContainerSize() {
         }
 
         // Download CSV
+        function saveToDatabase(dataType) {
+            let data;
+            data = sampleData.connectionData; // use your actual data source
+            const toastContainer = document.getElementById("toast-custom-container");
+            const btn = document.getElementById("save-btn");
+
+            // Disable button & update text
+            btn.disabled = true;
+            btn.textContent = "⏳ Saving to Database";
+
+            // Clear previous toast
+            toastContainer.innerHTML = "";
+
+            fetch('/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => {
+                if (!res.ok) {
+                    // If HTTP status is not 2xx, treat as an error
+                    throw new Error(`Server responded with ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(res => {
+                // ✅ Success handling
+                showToast("✅ Saved to Database", "success");
+            })
+            .catch(err => {
+                console.error(err);
+                // ❌ Error handling
+                showToast("❌ Failed to Save", "error");
+            })
+            .finally(() => {
+                // Re-enable and reset button regardless of outcome
+                btn.disabled = false;
+                btn.textContent = "📥 Save to Database";
+            });
+
+
+            function showToast(message, type) {
+                const toast = document.createElement("div");
+                toast.className = `toast-custom toast-custom-${type}`;
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+            }
+        }
+
         function downloadCSV(dataType) {
             let data, filename;
             
@@ -1609,6 +1758,29 @@ function ensureCanvasContainerSize() {
             } else if (dataType === 'connection-data') {
                 data = sampleData.connectionData;
                 filename = 'connection_analysis.csv';
+            } else if (dataType === 'connection-pairs') {
+                const connectionData = sampleData.connectionData;
+
+                data = [
+                    ["connection", "page_number"],  // <-- header row
+                    ...connectionData.flatMap(conn => {
+                        const srcComponent = conn.source_component || "<N.A.>";
+                        const srcTerminal = conn.source_terminal || "<N.A.>";
+                        const dstComponent = conn.dest_component || "<N.A.>";
+                        const dstTerminal = conn.dest_terminal || "<N.A.>";
+
+                        const pair1 = `${srcComponent}-${srcTerminal}/${dstComponent}-${dstTerminal}`;
+                        const pair2 = `${dstComponent}-${dstTerminal}/${srcComponent}-${srcTerminal}`;
+
+                        return [[pair1, pair2]];
+                    })
+                ];
+
+
+                filename = 'connection_pairs.csv';
+            } else {
+                console.error('Unknown data type for CSV download:', dataType);
+                return;
             }
 
             if (data == undefined ||data.length === 0) return;

@@ -1998,7 +1998,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
 
                 if dest_terminal and 'terminal' in dest_terminal.lower():
                     dest_component = 'Terminal'
-                    dest_terminal = dest_terminal.replace('Terminal_', '').strip() 
+                    dest_terminal = dest_terminal.replace('Terminal', '').strip() 
 
                 # Append coordinates too
                 records_new.append((
@@ -2043,6 +2043,113 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             img=cropped_img,
         )
 
+        def draw_unique_component_bboxes(bounding_boxes):
+            """
+            Generate unique component IDs for bounding boxes and return new list.
+            
+            bounding_boxes: list of tuples (x1, y1, x2, y2, component_name)
+            Returns: list of tuples (x1, y1, x2, y2, component_name, unique_id)
+            """
+            new_bounding_boxes = []
+
+            for (x1, y1, x2, y2, component_name) in bounding_boxes:
+                bbox_coords = (x1, y1, x2, y2)
+                unique_id = get_unique_component_id(component_name, bbox_coords)
+                new_bounding_boxes.append((x1, y1, x2, y2, component_name, unique_id))
+
+            return new_bounding_boxes
+
+        # Example usage
+        new_bounding_boxes = draw_unique_component_bboxes(bounding_boxes)
+        cv2.imwrite("image.png", cropped_img)  # save
+        from google.genai import types
+        import json
+        import csv
+        import base64
+        from google import genai
+        from PIL import Image
+        import io
+        api_key = "AIzaSyC9Vj0VA8aP1ThOBjR7J1MK-6eluxLCnsE"
+        client = genai.Client(api_key=api_key)
+
+        def map_components_to_logical_names(new_bounding_boxes, cv2_image, csv_path="component_mapping.csv"):
+            # Convert bounding boxes to string
+            bbox_description = "\n".join(
+                [f"ID: {uid}, Component: {name}, Coords: ({x1},{y1},{x2},{y2})"
+                for x1, y1, x2, y2, name, uid in new_bounding_boxes]
+            )
+            
+            # Your prompt remains the same
+            prompt = f"""
+                You are given an image of a circuit diagram and a list of components:
+                {bbox_description}
+
+                **Absolute Rules - DO NOT DEVIATE:**
+                1.  **No Sequential Inference:** You MUST IGNORE any perceived numerical or alphabetical order. Component labels in schematics are not always sequential. The first current transformer (CT) component you see could be labeled 'CT3', and the next could be 'CT1'. This is normal and correct.
+                2.  **No "Correcting":** Do not change a label to fit a sequence. If the label in the image is clearly 'CT3', its logical name is 'CT3'. This is not an error to be fixed.
+                3.  **Visual Evidence Only:** Rely strictly on the text that is visibly printed in the image. Do not hallucinate or guess names.
+
+                Return the results as a JSON dictionary with 'unique_id' as the key and 'logical_name' as the value.
+            """
+
+            # 1. Encode cv2 image to PNG bytes
+            success, buffer = cv2.imencode(".png", cv2_image)
+            if not success:
+                raise ValueError("Failed to encode image")
+            
+            # 2. Convert the byte buffer to a PIL Image object
+            image_bytes = buffer.tobytes()
+            image = Image.open(io.BytesIO(image_bytes))
+
+            # 3. Call the API with the simplified, correct structure
+            response = client.models.generate_content(
+                model="gemini-2.5-pro",
+                contents=[prompt, image],  # <-- This is the corrected line
+                config=types.GenerateContentConfig(temperature=0)
+            )
+
+            # Extract content
+            content = response.text
+
+
+            try:
+                # Find the start and end of the actual JSON object
+                start = content.find('{')
+                end = content.rfind('}') + 1
+                
+                # Slice the string to get only the JSON part
+                json_string = content[start:end]
+                
+                # Now, parse the cleaned string
+                mapping = json.loads(json_string)
+
+                # Save CSV (your existing code is fine here)
+                with open(csv_path, "w", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["unique_id", "logical_name"])
+                    for uid, logical_name in mapping.items():
+                        writer.writerow([uid, logical_name])
+                
+                print(f"Successfully parsed JSON and saved to {csv_path}")
+
+            except (json.JSONDecodeError, ValueError): # Catch errors if JSON is malformed or braces aren't found
+                # return {"error": "Model did not return valid JSON", "raw_content": content}
+                print("Error: Could not parse JSON from the raw content.")
+                print("Raw Content:", content)
+            return mapping
+
+        # result = map_components_to_logical_names(new_bounding_boxes, cropped_img)
+
+        # def map_component(name):
+        #     if pd.isna(name):  # handle NaN values
+        #         return name
+        #     if name.startswith("Terminal"):
+        #         return "Terminal"
+        #     return result.get(name, name)  # fallback to original if not found
+
+        # # Apply mapping to dataframe
+        # df_connections["source_component"] = df_connections["source_component"].map(map_component)
+        # df_connections["dest_component"] = df_connections["dest_component"].map(map_component)
 
 
     return df_wire, df_connections, combined_canvas, cropped_with_junctions, line_canvas, drawn_lines_lst

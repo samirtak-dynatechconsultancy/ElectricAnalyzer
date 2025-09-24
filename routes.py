@@ -22,7 +22,8 @@ import time
 from optimize_pdf.ghostscript import optimize_pdf
 import fitz
 import hashlib
-
+from models import db, Log, Report
+import json
 main = Blueprint('main', __name__)
 
 
@@ -169,10 +170,11 @@ def add_white_box():
         # Add white rectangle annotation
         annot = page.add_rect_annot(rect)
         annot.set_colors(fill=[1, 1, 1])  # White fill  
+        annot.set_border(width=0)  # No border
         annot.update()
 
         # --- ADD TEXT IN THE CENTER ---
-        font_size = min(height * 0.6, width * 0.6)  # Scale font to fit box
+        font_size = 0.1  # Scale font to fit box
         text_rect = fitz.Rect(pdf_x1, pdf_y1, pdf_x2, pdf_y2)
 
         page.insert_textbox(
@@ -250,6 +252,7 @@ def optimize_file():
 @main.route('/analyze', methods=['POST'])
 def analyze_circuit():
     try:
+        print(session)
         folder_path = os.path.join(RESULTS_FOLDER, session.get('id', 'guest'))
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path)  # Deletes folder + all files inside it
@@ -354,6 +357,16 @@ def analyze_circuit():
 
         ed = time.time()
         print("TOTAL TIME", ed - st)
+        user = get_user_by_email(session['user_email'])
+        new_log = Log(
+            username=user.get('full_name'),
+            email=user.get('email'),
+            file=file_stem,
+            page=page
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
         return jsonify({
             "success": True,
             "message": "Analysis completed successfully!",
@@ -378,6 +391,42 @@ def analyze_circuit():
     # finally:
     #     if file_handler:
     #         file_handler.cleanup()
+
+
+@main.route('/save', methods=['POST'])
+def save_report():
+
+    data_list = request.get_json()  # expects a list of dicts
+    data_list = [] 
+    if not data_list:
+        return jsonify({'error': 'No data provided'}), 400
+
+    user = get_user_by_email(session['user_email'])
+
+    for item in data_list:
+        # Ensure selected is boolean
+        selected_value = item.get('selected')
+        if isinstance(selected_value, str):
+            selected_value = selected_value.lower() in ['true', '1', 'yes']
+        elif not selected_value:
+            selected_value = False
+        report_entry = Report(
+            username = user.get('full_name'),
+            email = user.get('email'),
+            wire_no = item.get('wire_no'),
+            source_component = item.get('source_component'),
+            source_terminal = item.get('source_terminal'),
+            dest_component = item.get('dest_component'),
+            dest_terminal = item.get('dest_terminal'),
+            selected = selected_value,
+            reason = item.get('reason')
+        )
+        db.session.add(report_entry)
+
+    db.session.commit()
+    flash(f"{len(data_list)} records saved successfully", "success")
+    return jsonify({'message': f'{len(data_list)} records saved successfully'})
+
 
 @main.route('/favicon.ico')
 def favicon():

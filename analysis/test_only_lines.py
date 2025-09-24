@@ -202,8 +202,8 @@ def draw_connections_from_df_connections(df_connections, img):
         direction = p2 - p1
         length = np.linalg.norm(direction)
 
-        if length < 10:  # too short to draw arrows
-            continue
+        # if length < 10:  # too short to draw arrows
+        #     continue
 
         direction /= length  # unit vector
         normal = np.array([-direction[1], direction[0]])  # perpendicular for triangle width
@@ -218,7 +218,12 @@ def draw_connections_from_df_connections(df_connections, img):
         margin = size * 1.5
         effective_length = length - 2 * margin
         if effective_length <= 0:
-            continue
+            # Fallback: still draw at least one arrow in the middle
+            effective_length = length
+            num_arrows = 1
+        else:
+            num_arrows = max(1, int(effective_length // spacing))
+
 
         num_arrows = int(effective_length // spacing)
         for i in range(1, num_arrows + 1):
