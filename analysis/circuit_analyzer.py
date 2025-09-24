@@ -2089,7 +2089,6 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 2.  **No "Correcting":** Do not change a label to fit a sequence. If the label in the image is clearly 'CT3', its logical name is 'CT3'. This is not an error to be fixed.
                 2.1. **Switch Components:** If the system analyzes a component in the diagram that is clearly labeled "S3", its logical_name becomes "S3". The system will not "correct" it to "S1" just because it's the first one it found.
                 3.  **Visual Evidence Only:** Rely strictly on the text that is visibly printed in the image. Do not hallucinate or guess names.
-                4. There may be components with different common names (dashed box, other); you have to suggest a good logical name based on the provided image, basically other would be basic electrical control circuit, etc.
                 Return the results as a JSON dictionary with 'unique_id' as the key and 'logical_name' as the value.
             """
 
