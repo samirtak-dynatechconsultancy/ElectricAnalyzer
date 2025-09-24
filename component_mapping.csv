@@ -1,0 +1,37 @@
+unique_id,logical_name
+Neutral Sensor_1,N-SENSOR
+Circuit Breaker,Q1
+Neutral Sensor,N-SENSOR
+Circuit Breaker_1,Q2
+Source,
+Switch_2,SD
+Switch,SD
+Current Transformer_3,CT1
+Current Transformer_4,CT2
+Current Transformer_5,CT3
+Feeder_1,RESERVE-(BSUPSB02B)
+Current Transformer_2,CT3
+Current Transformer,CT1
+BMS_1,X1
+BMS,X1
+Multimeter_1,PM5330
+Circuit Breaker_2,Q1
+Circuit Breaker_5,Q2
+Multimeter,PM5330
+Earth,
+Switch_3,OF
+Switch_1,OF
+Fuse_4,FU
+Feeder,Diesel Generator (BS-FOS-DGR-001) starter panel-(BSUPSB02A)
+Current Transformer_1,CT2
+Circuit Breaker_4,Q1
+Circuit Breaker_3,Q2
+Earth_1,
+Earth_2,
+Sheild,SHIELDED CABLE
+Sheild_1,SHIELDED CABLE
+Earth_3,
+Fuse_3,FU
+Fuse_2,FU
+Fuse,FU
+Fuse_1,FU
