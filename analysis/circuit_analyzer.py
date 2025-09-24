@@ -2138,18 +2138,18 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 print("Raw Content:", content)
             return mapping
 
-        # result = map_components_to_logical_names(new_bounding_boxes, cropped_img)
+        result = map_components_to_logical_names(new_bounding_boxes, cropped_img)
 
-        # def map_component(name):
-        #     if pd.isna(name):  # handle NaN values
-        #         return name
-        #     if name.startswith("Terminal"):
-        #         return "Terminal"
-        #     return result.get(name, name)  # fallback to original if not found
+        def map_component(name):
+            if pd.isna(name):  # handle NaN values
+                return name
+            if name.startswith("Terminal"):
+                return "Terminal"
+            return result.get(name, name)  # fallback to original if not found
 
-        # # Apply mapping to dataframe
-        # df_connections["source_component"] = df_connections["source_component"].map(map_component)
-        # df_connections["dest_component"] = df_connections["dest_component"].map(map_component)
+        # Apply mapping to dataframe
+        df_connections["source_component"] = df_connections["source_component"].map(map_component)
+        df_connections["dest_component"] = df_connections["dest_component"].map(map_component)
 
 
     return df_wire, df_connections, combined_canvas, cropped_with_junctions, line_canvas, drawn_lines_lst
