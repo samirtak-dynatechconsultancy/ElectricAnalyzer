@@ -551,7 +551,7 @@ def initialize_users_csv():
     if not os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(['email', 'password_hash', 'full_name', 'registration_date'])
+            writer.writerow(['unique_id','email', 'password_hash', 'full_name', 'registration_date'])
 
 def save_user(unique_id, email, password, full_name):
     """Save user details to CSV"""

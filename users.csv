@@ -1,4 +1,2 @@
-email,password_hash,full_name,registration_date
-taksamir08@gmail.com,pbkdf2:sha256:600000$eYXzZ25r9LbKkyIi$e6c179bcc2c2de75770b1cd1ce924f8b1307568c4fcc98c5d06d655d2f132772,Samir Tak,2025-09-11 18:21:22
-shubham@a.com,pbkdf2:sha256:600000$nEFr5vM37JYyA8cK$ca01cd74fe170973991c3508c19584cb1efd8bb5b6e6b670169928e62170bf99,Shubham Kumbhar,2025-09-11 18:26:40
-admin@admin.com,pbkdf2:sha256:600000$7XO8qT72AX7tzukK$9100371d268a0019a0cf25f3d467466698f1144d3a8bceec2dd7b2298d371bb6,admin,2025-09-12 10:51:57
+unique_id,email,password_hash,full_name,registration_date
+5edfa2692bdacc5e,admin@admin.com,pbkdf2:sha256:600000$6SU9LeaGU1U06R3Z$4d186bf2fd54286c11e9a561f653ba01cd43d97ed18c537286046616a7388ec1,admin,2025-09-24 15:11:12
