@@ -450,7 +450,7 @@ function renderComponentOverlays(pageNum) {
 
             fileReader.onload = function () {
                 const typedarray = new Uint8Array(this.result);
-
+                let submitBtn = document.getElementById('submit-btn');
                 pdfjsLib.getDocument(typedarray).promise.then(function (pdf) {
                     pdfDoc = pdf;
                     totalPdfPages = pdf.numPages;
@@ -526,7 +526,7 @@ function renderPdfPage(pageNumber, canvasId = 'pdf-canvas') {
         // More robust container width calculation
         if (containerWidth <= 60) {
             // Fallback: use a reasonable default width
-            containerWidth = 800;
+            containerWidth = 1258;
             console.warn('Container width too small, using fallback:', containerWidth);
         } else {
             // Only subtract padding if we have enough width

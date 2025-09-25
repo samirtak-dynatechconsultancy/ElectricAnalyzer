@@ -206,51 +206,6 @@ def redact_image_by_boxes(image, boxes, fill_color=(255,255,255), shrink=2):
     # cv2.imwrite("redacted.png", out)
     return out
 
-def find_wire_endpoint_connections(all_wires, threshold=WIRE_CONNECTION_THRESHOLD):
-    """
-    Find connections between wire endpoints (wire-to-wire connections)
-    Returns list of connections: [(wire1_idx, wire1_end, wire2_idx, wire2_end, distance)]
-    where wire1_end and wire2_end are 'start' or 'end'
-    threshold: Distance threshold for considering wire endpoints as connected
-    """
-    connections = []
-    
-    for i, wire1 in enumerate(all_wires):
-        y1_1, y2_1, x1_1, x2_1 = wire1.line
-        wire1_start = (x1_1, y1_1)
-        wire1_end = (x2_1, y2_1)
-        
-        length_1 = math.sqrt((x2_1 - x1_1)**2 + (y2_1 - y1_1)**2)
-        if length_1 < MIN_LENGTH:
-            continue  # Skip wires that are too short
-        for j, wire2 in enumerate(all_wires):
-            if i >= j:  # Avoid duplicate pairs and self-comparison
-                continue
-                
-            y1_2, y2_2, x1_2, x2_2 = wire2.line
-            wire2_start = (x1_2, y1_2)
-            wire2_end = (x2_2, y2_2)
-            
-            length_2 = math.sqrt((x2_2 - x1_2)**2 + (y2_2 - y1_2)**2)
-            if length_2 < MIN_LENGTH or length_1 < MIN_LENGTH:
-                continue  # Skip wires that are too short
-            else:
-                # Check all endpoint combinations
-                endpoint_pairs = [
-                    (wire1_start, 'start', wire2_start, 'start'),
-                    (wire1_start, 'start', wire2_end, 'end'),
-                    (wire1_end, 'end', wire2_start, 'start'),
-                    (wire1_end, 'end', wire2_end, 'end')
-                ]
-            
-            for (p1, end1, p2, end2) in endpoint_pairs:
-                distance = math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
-                if distance <= threshold:
-                    connections.append((i, end1, j, end2, distance))
-    
-    return connections
-
-
 def is_prohibited_connection(label1, label2):
     """
     Returns True if connection between label1 and label2 should be ignored.
@@ -279,11 +234,56 @@ def point_inside_box(point, boxes):
             return True
     return False
 
+import math
+
 def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_boxes, threshold=WIRE_CONNECTION_THRESHOLD):
     """
     Finds wire endpoint connections while ignoring endpoints inside bounding boxes.
+    Now includes perpendicular connections where endpoints connect to wire lines.
     """
     connections = []
+    intersection_points = []  # Store intersection coordinates
+
+    def point_to_line_distance_and_projection(point, line_start, line_end):
+        """
+        Calculate the perpendicular distance from a point to a line segment
+        and return the projection point on the line.
+        Returns (distance, projection_point, is_on_segment)
+        """
+        px, py = point
+        x1, y1 = line_start
+        x2, y2 = line_end
+        
+        # Vector from line start to line end
+        dx = x2 - x1
+        dy = y2 - y1
+        
+        # If the line is actually a point
+        if dx == 0 and dy == 0:
+            dist = math.sqrt((px - x1)**2 + (py - y1)**2)
+            return dist, (x1, y1), False
+        
+        # Parameter t for the projection
+        t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
+        
+        # Debug print
+        # print(f"  Point {point} to line {line_start}-{line_end}: t={t:.4f}")
+        
+        # Projection point (using unclamped t for accurate projection)
+        proj_x = x1 + t * dx
+        proj_y = y1 + t * dy
+        
+        # Distance from point to projection
+        distance = math.sqrt((px - proj_x)**2 + (py - proj_y)**2)
+        
+        # Check if projection is on the line segment (excluding very close to endpoints)
+        # Use a small epsilon to avoid endpoint connections
+        epsilon = 0.01  # Adjust this value as needed
+        is_on_segment = epsilon < t < (1 - epsilon)
+        # if is_on_segment:
+        #     print(f"  Distance: {distance:.4f}, is_on_segment: {is_on_segment}")
+        
+        return distance, (proj_x, proj_y), is_on_segment
 
     for i, wire1 in enumerate(all_wires):
         y1_1, y2_1, x1_1, x2_1 = wire1.line
@@ -314,6 +314,7 @@ def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box
             if point_inside_box(wire2_start, bounding_boxes) and point_inside_box(wire2_end, bounding_boxes):
                 continue
 
+            # ORIGINAL: Check endpoint-to-endpoint connections
             endpoint_pairs = [
                 (wire1_start, 'start', wire2_start, 'start'),
                 (wire1_start, 'start', wire2_end, 'end'),
@@ -337,7 +338,84 @@ def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box
 
                     connections.append((i, end1, j, end2, distance))
 
-    return connections
+            # NEW: Check perpendicular connections
+            # print(f"\nChecking wire {i} endpoints against wire {j} line:")
+            
+            # Check wire1_start against wire2 line (perpendicular connection)
+            if not point_inside_box(wire1_start, bounding_boxes):
+                dist, proj_point, is_on_segment = point_to_line_distance_and_projection(
+                    wire1_start, wire2_start, wire2_end
+                )
+                if dist <= threshold and is_on_segment:
+                    # Check if projection point is inside a bounding box
+                    if not point_inside_box(proj_point, bounding_boxes):
+                        # Find closest text for endpoint and projection
+                        label1 = find_closest_text("source", wire1_start, text_boxes)
+                        label2 = find_closest_text("source", proj_point, text_boxes)
+                        
+                        if not is_prohibited_connection(label1, label2):
+                            print(f"Wire {i} start connects perpendicularly to wire {j} line at {proj_point} (dist {dist})")
+                            connections.append((i, 'start', j, 'end', dist))
+                            # Store the intersection details
+                            intersection_points.append(proj_point)
+
+            # Check wire1_end against wire2 line (perpendicular connection)
+            if not point_inside_box(wire1_end, bounding_boxes):
+                dist, proj_point, is_on_segment = point_to_line_distance_and_projection(
+                    wire1_end, wire2_start, wire2_end
+                )
+                if dist <= threshold and is_on_segment:
+                    # Check if projection point is inside a bounding box
+                    if not point_inside_box(proj_point, bounding_boxes):
+                        # Find closest text for endpoint and projection
+                        label1 = find_closest_text("source", wire1_end, text_boxes)
+                        label2 = find_closest_text("source", proj_point, text_boxes)
+                        
+                        if not is_prohibited_connection(label1, label2):
+                            print(f"Wire {i} end connects perpendicularly to wire {j} line at {proj_point} (dist {dist})")
+                            connections.append((i, 'end', j, 'start', dist))
+                            # Store the intersection details
+                            intersection_points.append(proj_point)
+
+            # Check wire2_start against wire1 line (perpendicular connection)
+            if not point_inside_box(wire2_start, bounding_boxes):
+                dist, proj_point, is_on_segment = point_to_line_distance_and_projection(
+                    wire2_start, wire1_start, wire1_end
+                )
+                if dist <= threshold and is_on_segment:
+                    # Check if projection point is inside a bounding box
+                    if not point_inside_box(proj_point, bounding_boxes):
+                        # Find closest text for endpoint and projection
+                        label1 = find_closest_text("source", wire2_start, text_boxes)
+                        label2 = find_closest_text("source", proj_point, text_boxes)
+                        
+                        if not is_prohibited_connection(label1, label2):
+                            print(f"Wire {j} start connects perpendicularly to wire {i} line at {proj_point} (dist {dist})")
+                            connections.append((j, 'start', i, 'end', dist))
+                            # Store the intersection details
+                            intersection_points.append(proj_point)
+
+            # Check wire2_end against wire1 line (perpendicular connection)
+            if not point_inside_box(wire2_end, bounding_boxes):
+                dist, proj_point, is_on_segment = point_to_line_distance_and_projection(
+                    wire2_end, wire1_start, wire1_end
+                )
+                if dist <= threshold and is_on_segment:
+                    # Check if projection point is inside a bounding box
+                    if not point_inside_box(proj_point, bounding_boxes):
+                        # Find closest text for endpoint and projection
+                        label1 = find_closest_text("source", wire2_end, text_boxes)
+                        label2 = find_closest_text("source", proj_point, text_boxes)
+                        
+                        if not is_prohibited_connection(label1, label2):
+                            print(f"Wire {j} end connects perpendicularly to wire {i} line at {proj_point} (dist {dist})")
+                            connections.append((j, 'end', i, 'start', dist))
+                            # Store the intersection details
+                            intersection_points.append(proj_point)
+
+    return connections, intersection_points
+
+
 
 def build_circuit_graph(horiz_wires, vert_wires, junction_points, text_boxes, bounding_box,
                        junction_threshold=JUNCTION_INTERSECTION_THRESHOLD, 
@@ -355,7 +433,7 @@ def build_circuit_graph(horiz_wires, vert_wires, junction_points, text_boxes, bo
     all_wires = list(horiz_wires) + list(vert_wires)
 
     intersections = find_line_junction_intersections(all_wires, junction_points, junction_threshold)
-    wire_connections = find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box, wire_connection_threshold)
+    wire_connections, manual_intersection_points = find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box, wire_connection_threshold)
     
     # print(f"Found {len(wire_connections)} wire-to-wire endpoint connections (threshold: {wire_connection_threshold})")
     # print(f"Found {len(intersections)} wire-junction intersections (threshold: {junction_threshold})")
@@ -452,7 +530,7 @@ def build_circuit_graph(horiz_wires, vert_wires, junction_points, text_boxes, bo
             graph[start_node].append(end_node)
             graph[end_node].append(start_node)
     
-    return graph, wire_endpoints, junction_nodes, intersections
+    return graph, wire_endpoints, junction_nodes, intersections, manual_intersection_points
 
 import colorsys
 import math
@@ -573,7 +651,7 @@ def assign_wire_colors_by_network(horiz_wires, vert_wires, junction_points, text
     Wires connected through junctions or wire endpoint connections get the same color.
     """    
     all_wires = list(horiz_wires) + list(vert_wires)
-    graph, wire_endpoints, junction_nodes, intersections = build_circuit_graph(
+    graph, wire_endpoints, junction_nodes, intersections, manual_intersection_points = build_circuit_graph(
         horiz_wires, vert_wires, junction_points, text_boxes, bounding_box)
     
     # Find connected components (networks) using DFS
@@ -666,7 +744,7 @@ def analyze_circuit_flow_improved(horiz_wires, vert_wires, junction_points, text
     3. Ensures proper flow direction visualization
     """    
     all_wires = list(horiz_wires) + list(vert_wires)
-    graph, wire_endpoints, junction_nodes, intersections = build_circuit_graph(
+    graph, wire_endpoints, junction_nodes, intersections, manual_intersection_points = build_circuit_graph(
         horiz_wires, vert_wires, junction_points, text_boxes, bounding_box)
     
     # Find connected components and assign base colors
@@ -751,7 +829,7 @@ def analyze_circuit_flow_improved(horiz_wires, vert_wires, junction_points, text
                 if current_colors['end_color'] is not None:
                     wire_colors[wire_idx]['end_color'] = source_color
     
-    return wire_colors, networks, network_colors, junction_nodes
+    return wire_colors, networks, network_colors, junction_nodes, manual_intersection_points
 
 def extend_line_through_junctions(wire, intersections_for_wire):
     """
@@ -944,7 +1022,7 @@ def line_detection_improved(image_path, text_boxes, bounding_box, draw_on_canvas
 
         if junction_points and enable_network_colors:
             intersections = find_line_junction_intersections(all_wires, junction_points)
-            wire_colors, networks, network_colors, junction_nodes = analyze_circuit_flow_improved(
+            wire_colors, networks, network_colors, junction_nodes, manual_intersection_points = analyze_circuit_flow_improved(
                 HorizWires, VertWires, junction_points, text_boxes, bounding_box)
             # print(f"Found {len(intersections)} line-junction intersections")
             # print(f"Identified {len(networks)} electrical networks")
@@ -1619,22 +1697,22 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
     detected_class_name = names[class_id]
 
     # --- Draw box for debugging ---
-    debug_img = img_cv.copy()
-    cv2.rectangle(
-        debug_img,
-        (int(x1), int(y1)), (int(x2), int(y2)),
-        (0, 255, 0), 3
-    )
-    cv2.putText(
-        debug_img,
-        detected_class_name,
-        (int(x1), max(int(y1) - 10, 20)),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        1,
-        (0, 255, 0),
-        2,
-        cv2.LINE_AA
-    )
+    # debug_img = img_cv.copy()
+    # cv2.rectangle(
+    #     debug_img,
+    #     (int(x1), int(y1)), (int(x2), int(y2)),
+    #     (0, 255, 0), 3
+    # )
+    # cv2.putText(
+    #     debug_img,
+    #     detected_class_name,
+    #     (int(x1), max(int(y1) - 10, 20)),
+    #     cv2.FONT_HERSHEY_SIMPLEX,
+    #     1,
+    #     (0, 255, 0),
+    #     2,
+    #     cv2.LINE_AA
+    # )
     # cv2.imwrite("bnd_test.png", debug_img)
 
     # --- Map to PDF coordinate space ---
@@ -1656,6 +1734,38 @@ def detect_and_crop_largest_box(pdf_file, page_no, zoom=4.0, confidence=0.5):
     # cv2.imwrite("DETECTED.png", cropped_img_cv)
     return fitz_page, cropped_img_cv, detected_class_name, x,y,w,h
 
+
+def is_near_manual_point(point, manual_set, threshold=3):
+    """
+    Check if point is within `threshold` pixels of any point in manual_set.
+    """
+    px, py = point
+    for mx, my in manual_set:
+        if abs(px - mx) <= threshold and abs(py - my) <= threshold:
+            return True
+    return False
+
+def draw_results_on_image(bounding_boxes, image):
+    for (xmin, ymin, xmax, ymax, class_name) in bounding_boxes:
+        # Skip unwanted classes
+        if 'drawout' in class_name.lower():
+            continue
+
+        # Convert to int for OpenCV
+        xmin, ymin, xmax, ymax = [int(v) for v in (xmin, ymin, xmax, ymax)]
+
+        # ✅ Draw rectangle
+        cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+
+        # ✅ Add label text
+        label = f"{class_name}"
+        (text_w, text_h), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
+        # Draw filled rectangle behind text
+        cv2.rectangle(image, (xmin, ymin - text_h - baseline), (xmin + text_w, ymin), (0, 255, 0), -1)
+        # Put the text
+        cv2.putText(image, label, (xmin, ymin - baseline), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+    cv2.imwrite("annotated_output.png", image)
+    # return image, bounding_boxes
 
 from .test_only_lines import draw_connections_from_df_connections
 def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enable_network_colors=True, wire_connection_threshold=WIRE_CONNECTION_THRESHOLD, xml=None):
@@ -1724,11 +1834,20 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             class_name = result.names[cls_id]
             if 'drawout' in class_name.lower():
                 continue
+
             # Cast to native Python float
             xmin, ymin, xmax, ymax = [int(v) for v in xyxy]
 
+            if 'other' in class_name.lower():
+                xmin -= 10
+                ymin -= 10
+                xmax += 10
+                ymax += 10
+
             bounding_boxes.append((xmin, ymin, xmax, ymax, class_name))
 
+    draw_results_on_image(bounding_boxes, cropped_img.copy())
+    # 5/0
     # cropped_img = img.copy()
     # print(f"Image cropped to region: x={x}, y={y}, w={w}, h={h}")
 
@@ -1785,8 +1904,10 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
 
         if enable_network_colors:
             intersections = find_line_junction_intersections(all_wires, junction_points)
-            wire_colors, networks, network_colors, junction_nodes = analyze_circuit_flow_improved(
+            wire_colors, networks, network_colors, junction_nodes, manual_intersection_points = analyze_circuit_flow_improved(
                 horiz_wires, vert_wires, junction_points, text_boxes=boxes, bounding_box=bounding_boxes)
+        
+            manual_set = {(int(x), int(y)) for x, y in manual_intersection_points}
 
             # Draw wires with network colors and flow analysis
             for idx, wire in enumerate(horiz_wires):
@@ -1796,6 +1917,12 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 pt_start = (int(x1), int(y1))
                 pt_end = (int(x2), int(y2))
                 length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                # if pt_start in manual_intersection_points or pt_end in manual_intersection_points:
+                #     continue
+                # if is_near_manual_point(pt_start, manual_set) or is_near_manual_point(pt_end, manual_set):
+                #     # Optional: Debug print to confirm
+                #     print(f"Skipping {pt_start}->{pt_end} (close to manual intersection)")
+                #     continue
 
                 # Get wire colors
                 colors = wire_colors.get(idx, {})
@@ -1803,6 +1930,8 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 if line_in_box(pt_start, pt_end, bounding_boxes):
                     continue
                 cv2.line(combined_canvas, pt_start, pt_end, line_color, 2, cv2.LINE_AA)
+                cv2.putText(combined_canvas, str(idx), (pt_start[0]+5, pt_start[1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
+
                 # Add endpoint markers
                 if colors.get('start_color') is not None:
                     cv2.circle(combined_canvas, pt_start, 6, colors['start_color'], -1)
@@ -1823,6 +1952,10 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 pt_start = (int(x1), int(y1))
                 pt_end = (int(x2), int(y2))
                 length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                # if is_near_manual_point(pt_start, manual_set) or is_near_manual_point(pt_end, manual_set):
+                #     # Optional: Debug print to confirm
+                #     print(f"Skipping {pt_start}->{pt_end} (close to manual intersection)")
+                #     continue
 
 
                 # Get wire colors
@@ -1832,6 +1965,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 if line_in_box(pt_start, pt_end, bounding_boxes):
                     continue
                 cv2.line(combined_canvas, pt_start, pt_end, line_color, 2, cv2.LINE_AA)
+                cv2.putText(combined_canvas, str(wire_idx), (pt_start[0]+5, pt_start[1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
                 
                 # Add endpoint markers
                 if colors.get('start_color') is not None:
@@ -1970,9 +2104,16 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             if not points:
                 continue
 
-            # Sort by x first, then y
-            sorted_points = sorted(points, key=lambda p: (p[0], p[1]))
+            filtered_points = [p for p in points if not is_near_manual_point(p, manual_set)]
+
+            if not filtered_points:
+                # Skip this wire if all points are near manual intersections
+                continue
+
+            # Sort by x then y after filtering
+            sorted_points = sorted(filtered_points, key=lambda p: (p[0], p[1]))
             source_point = sorted_points[0]
+            
 
             # Get component with unique ID
             source_component = find_component_with_id(source_point, bounding_boxes)
@@ -1992,7 +2133,8 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                     continue
                 if source_component and dest_component and "sensor" in source_component.lower() and "breaker" in dest_component.lower():
                     continue
-
+                if source_component and dest_component and "control voltage" in source_component.lower() and "control voltage" in dest_component.lower():
+                    continue
                 if source_component and dest_component and "multi" in source_component.lower() and "sheild" in dest_component.lower():
                     continue
 
@@ -2139,6 +2281,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             return mapping
 
         try:
+            5/0
             result = map_components_to_logical_names(new_bounding_boxes, cropped_img)
 
             def map_component(name):
