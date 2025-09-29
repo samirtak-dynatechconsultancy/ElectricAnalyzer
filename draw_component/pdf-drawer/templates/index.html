@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF White Box Editor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+        }
+        
+        .upload-section.dragover {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        
+        .upload-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .page-controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .page-controls button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .page-controls button:hover {
+            background-color: #218838;
+        }
+        
+        .page-controls button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .pdf-viewer {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .pdf-page {
+            position: relative;
+            display: inline-block;
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            cursor: crosshair;
+        }
+        
+        .pdf-page img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .coords-display {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .box-size-controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .box-size-controls label {
+            margin: 0 10px;
+        }
+        
+        .box-size-controls input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        
+        .download-btn {
+            background-color: #17a2b8;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .download-btn:hover {
+            background-color: #138496;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>PDF White Box Editor</h1>
+        <p>Upload a PDF file, select a page, and click anywhere to add white boxes.</p>
+        
+        <div class="upload-section" id="uploadSection">
+            <h3>Upload PDF File</h3>
+            <input type="file" id="fileInput" class="file-input" accept=".pdf">
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                Choose PDF File
+            </button>
+            <p>or drag and drop a PDF file here</p>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div id="pageControls" class="page-controls" style="display: none;">
+            <button id="prevBtn" onclick="changePage(-1)">&larr; Previous</button>
+            <span id="pageInfo">Page 1 of 1</span>
+            <button id="nextBtn" onclick="changePage(1)">Next &rarr;</button>
+        </div>
+        
+        <div id="boxSizeControls" class="box-size-controls" style="display: none;">
+            <label>Width: <input type="number" id="boxWidth" value="20" min="10" max="200"></label>
+            <label>Height: <input type="number" id="boxHeight" value="20" min="10" max="200"></label>
+        </div>
+        
+        <div id="pdfViewer" class="pdf-viewer">
+            <div id="coordsDisplay" class="coords-display"></div>
+        </div>
+        
+        <div id="downloadSection" class="controls" style="display: none;">
+            <button class="download-btn" onclick="downloadModifiedPDF()">Download Modified PDF</button>
+        </div>
+    </div>
+
+    <script>
+        let currentFile = null;
+        let currentPage = 0;
+        let totalPages = 0;
+        let pageScale = 1;
+        let originalPageWidth = 0;
+        let originalPageHeight = 0;
+        let scaleX = 1;
+        let scaleY = 1;
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // Drag and drop functionality
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+        
+        uploadSection.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+        });
+        
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            if (file.type !== 'application/pdf') {
+                showStatus('Please select a PDF file.', 'error');
+                return;
+            }
+            
+            uploadFile(file);
+        }
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            showStatus('Uploading file...', 'success');
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentFile = data.filename;
+                    totalPages = data.page_count;
+                    currentPage = 0;
+                    showStatus(`PDF uploaded successfully! ${totalPages} pages found.`, 'success');
+                    showPageControls();
+                    showBoxSizeControls();
+                    loadPage(0);
+                } else {
+                    showStatus(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus(`Error uploading file: ${error}`, 'error');
+            });
+        }
+
+        function loadPage(pageNum) {
+            if (!currentFile) return;
+            
+            showStatus('Loading page...', 'success');
+            
+            fetch(`/get_page/${currentFile}/${pageNum}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayPage(data);
+                    updatePageInfo();
+                    showDownloadSection();
+                    showStatus(`Page ${pageNum + 1} loaded. Click anywhere to add a white box.`, 'success');
+                } else {
+                    showStatus(`Error loading page: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus(`Error loading page: ${error}`, 'error');
+            });
+        }
+
+        function displayPage(pageData) {
+            const viewer = document.getElementById('pdfViewer');
+            
+            // Calculate scale factor
+            originalPageWidth = pageData.page_width;
+            originalPageHeight = pageData.page_height;
+            // pageScale = pageData.display_width / pageData.page_width;
+
+            
+            viewer.innerHTML = `
+                <div class="pdf-page" id="pdfImage" onclick="addWhiteBox(event)" style="position: relative;">
+                    <img src="${pageData.image}" alt="PDF Page ${currentPage + 1}">
+                    <div id="coordsDisplay" class="coords-display"></div>
+                </div>
+            `;
+        }
+
+        function addWhiteBox(event) {
+            const pdfViewer = document.getElementById('pdfViewer');
+            const pdfPage = event.currentTarget;
+            const viewerRect = pdfViewer.getBoundingClientRect();
+            const pageRect = pdfPage.getBoundingClientRect();
+
+                        //  remove this
+            const img = document.getElementById('pdfImage');
+            // img.onload = () => {
+                const renderedWidth = img.clientWidth;
+                const renderedHeight = img.clientHeight;
+
+                // Calculate scale dynamically
+                scaleX = renderedWidth / originalPageWidth;
+                scaleY = renderedHeight / originalPageHeight;
+
+                console.log(`Dynamic scale computed: scaleX=${scaleX}, scaleY=${scaleY}`);
+            // };
+            // This
+
+            // Calculate coordinates relative to the PDF page
+            const x = (event.clientX - pageRect.left) / scaleX;
+            const y = (event.clientY - pageRect.top) / scaleY;
+
+            // const x_final = (event.clientX - pageRect.left);
+            // const y_final = (event.clientY - pageRect.top);
+
+            // Position coordinates display relative to the PDF viewer
+            const coordsDiv = document.getElementById('coordsDisplay');
+            if (coordsDiv) {
+                coordsDiv.innerText = `Clicked at: X=${x.toFixed(1)}, Y=${y.toFixed(1)}`;
+                console.log(`Clicked at: X=${x.toFixed(1)}, Y=${y.toFixed(1)}`);
+                coordsDiv.style.display = 'block';
+                
+                // Position relative to the PDF viewer container
+                const displayX = event.clientX - viewerRect.left + 10;
+                const displayY = event.clientY - viewerRect.top - 25;
+                
+                coordsDiv.style.left = `${displayX}px`;
+                coordsDiv.style.top = `${displayY}px`;
+                coordsDiv.style.zIndex = 1000
+                
+                // Hide coordinates after 3 seconds
+                // setTimeout(() => {
+                //     coordsDiv.style.display = 'none';
+                // }, 3000);
+            }
+
+            const width = parseInt(document.getElementById('boxWidth').value);
+            const height = parseInt(document.getElementById('boxHeight').value);
+
+            showStatus('Adding white box...', 'success');
+
+            fetch('/add_white_box', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    filename: currentFile,
+                    page_num: currentPage,
+                    x: x,
+                    y: y,
+                    width: width,
+                    height: height
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus('White box added successfully!', 'success');
+                    loadPage(currentPage);
+                } else {
+                    showStatus(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus(`Error adding white box: ${error}`, 'error');
+            });
+        }
+
+        function changePage(direction) {
+            const newPage = currentPage + direction;
+            if (newPage >= 0 && newPage < totalPages) {
+                currentPage = newPage;
+                loadPage(currentPage);
+            }
+        }
+
+        function updatePageInfo() {
+            document.getElementById('pageInfo').textContent = `Page ${currentPage + 1} of ${totalPages}`;
+            document.getElementById('prevBtn').disabled = currentPage === 0;
+            document.getElementById('nextBtn').disabled = currentPage === totalPages - 1;
+        }
+
+        function showPageControls() {
+            document.getElementById('pageControls').style.display = 'block';
+        }
+
+        function showBoxSizeControls() {
+            document.getElementById('boxSizeControls').style.display = 'block';
+        }
+
+        function showDownloadSection() {
+            document.getElementById('downloadSection').style.display = 'block';
+        }
+
+        function downloadModifiedPDF() {
+            if (!currentFile) return;
+            
+            window.open(`/download/${currentFile}`, '_blank');
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

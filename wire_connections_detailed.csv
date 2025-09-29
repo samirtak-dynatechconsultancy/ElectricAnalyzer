@@ -1,0 +1,90 @@
+wire_no,source_component,source_terminal,dest_component,dest_terminal,source_point,dest_point,index_no,type
+1,,N,Circuit Breaker,1,"(11, 70)","(324, 700)",1,Power Line Diagram
+1,,N,Neutral Sensor,VC,"(11, 70)","(1179, 428)",2,Power Line Diagram
+1,,N,Feeder,N,"(11, 70)","(1244, 1800)",3,Power Line Diagram
+1,,N,Multimeter,VN,"(11, 70)","(1756, 1438)",4,Power Line Diagram
+1,,N,Multimeter,L2,"(11, 70)","(1826, 1438)",5,Power Line Diagram
+1,,N,Neutral Sensor_1,VC,"(11, 70)","(2114, 428)",6,Power Line Diagram
+1,,N,Feeder_1,N,"(11, 70)","(2180, 1773)",7,Power Line Diagram
+1,,N,Multimeter_1,L2,"(11, 70)","(2761, 1439)",8,Power Line Diagram
+1,,N,Source,N,"(11, 70)","(3079, 70)",9,Power Line Diagram
+2,,L1,Circuit Breaker_1,3,"(11, 148)","(402, 687)",12,Power Line Diagram
+2,,L1,Circuit Breaker_2,1,"(11, 148)","(1322, 535)",13,Power Line Diagram
+2,,L1,Circuit Breaker_3,1,"(11, 148)","(2257, 521)",14,Power Line Diagram
+2,,L1,Source,L1,"(11, 148)","(3082, 148)",15,Power Line Diagram
+3,,L2,Circuit Breaker_4,5,"(40, 226)","(479, 686)",16,Power Line Diagram
+3,,L2,Circuit Breaker_5,3,"(40, 226)","(1400, 535)",17,Power Line Diagram
+3,,L2,Circuit Breaker_6,3,"(40, 226)","(2335, 535)",18,Power Line Diagram
+3,,L2,Source,L2,"(40, 226)","(3051, 226)",19,Power Line Diagram
+4,BMS,L3,Circuit Breaker_7,7,"(11, 303)","(557, 700)",20,Power Line Diagram
+4,BMS,L3,Circuit Breaker_8,5,"(11, 303)","(1477, 521)",21,Power Line Diagram
+4,BMS,L3,Circuit Breaker_9,5,"(11, 303)","(2413, 535)",22,Power Line Diagram
+4,BMS,L3,Source,L3,"(11, 303)","(3081, 303)",23,Power Line Diagram
+9,BMS,1,Switch,21,"(28, 465)","(189, 611)",24,Power Line Diagram
+10,BMS_1,1,Switch_1,21,"(992, 649)","(1153, 811)",25,Power Line Diagram
+11,BMS_2,1,Switch_2,21,"(1927, 650)","(2088, 812)",26,Power Line Diagram
+12,Current Transformer,S2,Current Transformer_1,S2,"(1344, 1148)","(1422, 1081)",27,Power Line Diagram
+12,Current Transformer,S2,Current Transformer_2,S2,"(1344, 1148)","(1499, 1014)",28,Power Line Diagram
+12,Current Transformer,S2,Multimeter,I1-,"(1344, 1148)","(1614, 1271)",29,Power Line Diagram
+12,Current Transformer,S2,Multimeter,I2-,"(1344, 1148)","(1684, 1271)",30,Power Line Diagram
+12,Current Transformer,S2,Multimeter,I3-,"(1344, 1148)","(1754, 1271)",31,Power Line Diagram
+12,Current Transformer,S2,Multimeter,I4-,"(1344, 1148)","(1825, 1271)",32,Power Line Diagram
+12,Current Transformer,S2,Earth,,"(1344, 1148)","(1866, 1204)",33,Power Line Diagram
+13,Current Transformer_3,S2,Current Transformer_4,S2,"(2280, 1149)","(2358, 1082)",34,Power Line Diagram
+13,Current Transformer_3,S2,Current Transformer_5,S2,"(2280, 1149)","(2435, 1015)",35,Power Line Diagram
+13,Current Transformer_3,S2,Multimeter_1,I1-,"(2280, 1149)","(2550, 1272)",36,Power Line Diagram
+13,Current Transformer_3,S2,Multimeter_1,I2-,"(2280, 1149)","(2620, 1272)",37,Power Line Diagram
+13,Current Transformer_3,S2,Multimeter_1,I3-,"(2280, 1149)","(2690, 1272)",38,Power Line Diagram
+13,Current Transformer_3,S2,Multimeter_1,I4-,"(2280, 1149)","(2761, 1272)",39,Power Line Diagram
+13,Current Transformer_3,S2,Earth_1,,"(2280, 1149)","(2801, 1204)",40,Power Line Diagram
+14,Current Transformer_2,S1,Multimeter,I3+,"(1498, 1032)","(1720, 1271)",41,Power Line Diagram
+15,Current Transformer_5,S1,Multimeter_1,I3+,"(2450, 1033)","(2655, 1272)",42,Power Line Diagram
+16,Current Transformer_1,S1,Multimeter,I2+,"(1437, 1099)","(1650, 1271)",43,Power Line Diagram
+17,Current Transformer_4,S1,Multimeter_1,I2+,"(2372, 1100)","(2585, 1273)",44,Power Line Diagram
+18,Current Transformer,S1,Multimeter,I1+,"(1358, 1166)","(1582, 1271)",45,Power Line Diagram
+19,Current Transformer_3,S1,Multimeter_1,I1+,"(2293, 1167)","(2517, 1272)",46,Power Line Diagram
+20,Sheild,8,Earth_2,,"(2096, 1261)","(2142, 1333)",47,Power Line Diagram
+21,Sheild_1,8,Earth_3,,"(3031, 1262)","(3077, 1335)",48,Power Line Diagram
+22,Multimeter,+,BMS_3,5,"(1899, 1314)","(1982, 1226)",49,Power Line Diagram
+23,Multimeter_1,+,BMS_4,5,"(2835, 1315)","(2917, 1227)",50,Power Line Diagram
+24,Multimeter,-,BMS_3,6,"(1899, 1344)","(2015, 1226)",51,Power Line Diagram
+25,Multimeter_1,-,BMS_4,6,"(2834, 1345)","(2951, 1227)",52,Power Line Diagram
+26,Multimeter,SH,BMS_3,7,"(1899, 1370)","(2049, 1226)",53,Power Line Diagram
+27,Multimeter_1,SH,BMS_4,7,"(2834, 1371)","(2985, 1227)",54,Power Line Diagram
+28,Multimeter,C,BMS_3,8,"(1899, 1401)","(2083, 1226)",55,Power Line Diagram
+29,Multimeter_1,C,BMS_4,8,"(2834, 1402)","(3019, 1227)",56,Power Line Diagram
+30,Circuit Breaker_2,2,Feeder,L1,"(1322, 634)","(1322, 1802)",57,Power Line Diagram
+30,Circuit Breaker_2,2,Fuse,FU,"(1322, 634)","(1545, 1487)",58,Power Line Diagram
+31,Fuse,FU,Multimeter,V1,"(1586, 1487)","(1651, 1438)",59,Power Line Diagram
+31,Fuse,FU,Multimeter,L1,"(1586, 1487)","(1790, 1438)",60,Power Line Diagram
+32,Circuit Breaker_3,2,Feeder_1,L1,"(2257, 634)","(2257, 1800)",61,Power Line Diagram
+32,Circuit Breaker_3,2,Fuse_1,FU,"(2257, 634)","(2480, 1487)",62,Power Line Diagram
+33,Fuse_1,FU,Multimeter_1,V1,"(2521, 1487)","(2586, 1439)",63,Power Line Diagram
+33,Fuse_1,FU,Multimeter_1,L1,"(2521, 1487)","(2726, 1439)",64,Power Line Diagram
+34,Circuit Breaker_5,4,Feeder,L2,"(1400, 634)","(1400, 1773)",65,Power Line Diagram
+34,Circuit Breaker_5,4,Fuse_2,FU,"(1400, 634)","(1545, 1526)",66,Power Line Diagram
+35,Fuse_2,FU,Multimeter,V2,"(1584, 1526)","(1686, 1438)",67,Power Line Diagram
+36,Circuit Breaker_6,4,Feeder_1,L2,"(2335, 634)","(2335, 1802)",68,Power Line Diagram
+36,Circuit Breaker_6,4,Fuse_3,FU,"(2335, 634)","(2480, 1527)",69,Power Line Diagram
+37,Fuse_3,FU,Multimeter_1,V2,"(2521, 1527)","(2621, 1439)",70,Power Line Diagram
+38,Circuit Breaker_8,6,Feeder,L3,"(1477, 634)","(1477, 1770)",71,Power Line Diagram
+38,Circuit Breaker_8,6,Fuse_4,FU,"(1477, 634)","(1545, 1565)",72,Power Line Diagram
+39,Fuse_4,FU,Multimeter,V3,"(1584, 1565)","(1722, 1438)",73,Power Line Diagram
+40,Circuit Breaker_9,6,Feeder_1,L3,"(2413, 634)","(2413, 1802)",74,Power Line Diagram
+40,Circuit Breaker_9,6,Fuse_3,FU,"(2413, 634)","(2480, 1566)",75,Power Line Diagram
+41,Fuse_3,FU,Multimeter_1,V3,"(2521, 1566)","(2658, 1439)",76,Power Line Diagram
+42,BMS,2,Switch_3,44,"(80, 465)","(80, 542)",77,Power Line Diagram
+43,BMS,3,Switch_3,42,"(123, 465)","(123, 565)",78,Power Line Diagram
+44,BMS,4,Switch,24,"(181, 465)","(181, 542)",79,Power Line Diagram
+45,Circuit Breaker,2,Feeder_2,N,"(324, 798)","(324, 1801)",80,Power Line Diagram
+46,Circuit Breaker_1,4,Circuit Breaker_1,4,"(402, 798)","(402, 869)",82,Power Line Diagram
+46,Circuit Breaker_1,4,Feeder_2,L1,"(402, 798)","(402, 1770)",83,Power Line Diagram
+47,Circuit Breaker_4,6,Feeder_2,L2,"(479, 798)","(479, 1802)",84,Power Line Diagram
+48,Circuit Breaker_7,8,Feeder_2,L3,"(557, 798)","(557, 1773)",85,Power Line Diagram
+49,BMS_1,2,Switch_4,44,"(1043, 649)","(1043, 750)",86,Power Line Diagram
+50,BMS_1,3,Switch_4,42,"(1087, 649)","(1087, 726)",87,Power Line Diagram
+51,BMS_1,4,Switch_1,24,"(1144, 649)","(1144, 750)",88,Power Line Diagram
+52,BMS_2,2,Switch_5,44,"(1979, 650)","(1979, 727)",89,Power Line Diagram
+53,BMS_2,3,Switch_5,42,"(2022, 650)","(2022, 727)",90,Power Line Diagram
+54,BMS_2,4,Switch_2,24,"(2080, 650)","(2080, 727)",91,Power Line Diagram
+55,Multimeter_1,VN,,,"(2691, 1439)","(2691, 1697)",92,Power Line Diagram

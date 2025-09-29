@@ -15,7 +15,7 @@ from skimage.feature import peak_local_max, match_template
 from skimage.transform import probabilistic_hough_line, rotate
 import os
 
-from .classes import HorizontalLines, VerticalLines, WireHoriz, WireVert, Component, WireJunctions
+from .classes import HorizontalLines, VerticalLines, WireHoriz, WireVert, Component, WireJunctions, WireDiag
 from .io import importTemplate, exportTemplate, getNewImageCopy
 from .config import Config
 
@@ -23,17 +23,13 @@ from .config import Config
 config = Config()
 
 
-def sortWiresHough(horizWires, vertWires, image):
-    """ Bubble sort for found wires. Sorts horiz wires so they are sorted from left to right first, then bottom to top. Vert wires in reverse
-
-    :param horizWires: list: List of horizontal wires
-    :param vertWires: list: List of vertical wires
-    :param image: class: Image class of circuit diagram
-    :return list: List of sorted horizontal wires
-    :return list: List of sorted vertical wires
-    """
+def sortWiresHough(horizWires, vertWires, diagWires, image):
+    """ Bubble sort for found wires. """
     horizWiresSorted = []
     vertWiresSorted = []
+    diagWiresSorted = []
+    
+    # Sort horizontal wires
     for height in range(image.height):
         horizLineSort = []
         for horizWire in horizWires:
@@ -47,6 +43,7 @@ def sortWiresHough(horizWires, vertWires, image):
         for horizSortedLine in horizLineSort:
             horizWiresSorted.append(horizSortedLine)
 
+    # Sort vertical wires
     for width in range(image.width):
         vertLineSort = []
         for vertWire in vertWires:
@@ -59,8 +56,11 @@ def sortWiresHough(horizWires, vertWires, image):
                                                                                  vertLineSort[vertLocation]
         for vertSortedLine in vertLineSort:
             vertWiresSorted.append(vertSortedLine)
+    
+    # Sort diagonal wires by angle
+    diagWiresSorted = sorted(diagWires, key=lambda x: (x.angle, x.start[0], x.start[1]))
 
-    return horizWiresSorted, vertWiresSorted
+    return horizWiresSorted, vertWiresSorted, diagWiresSorted
 
 
 def sortLines(lines):
@@ -126,21 +126,31 @@ def wireCheck(Wires, Wire):
     return duplicateWire
 
 
-def wireScanHough(image, minWireLength=10, borderSize=15):
-    """ Scans for wires using Hough's transform
 
-    :param binarySkeleton: ndarray: Binarised skeletonized image of circuit diagram
-    :param minWireLength: int: minimum length before found line is counted as a wire
-    :param borderSize: int: amount of empty space in pixels at the normal of the found line in both directions before  line is counted as wire
-    :return: ndarray: Binary converted image.
-    """
+threshold = 25  # pixels
+
+def is_close_to_endpoints(p, endpoints, threshold=25):
+    for e in endpoints:
+        if abs(p[0] - e[0]) <= threshold and abs(p[1] - e[1]) <= threshold:
+            return True
+    return False
+
+
+def wireScanHough(image, minWireLength=10, borderSize=15):
+    """ Scans for wires using Hough's transform - diagonals only if connected to horiz/vert lines """
+
     HorizWires = []
     VertWires = []
+    DiagWires = []
+
+    # --- 1. Detect horizontal + vertical lines ---
+    # hv_angles = np.array([0, np.pi/2])
     for loop in range(0, 100):
+
         angles = np.linspace(0, np.pi / 2, 2)
         lines = probabilistic_hough_line(image.binarySkeleton, threshold=10, line_length=minWireLength,
-                                         line_gap=1,
-                                         theta=angles)  # finding lines in the image using houghs transform # thresh was 35 for siren
+                                            line_gap=1,
+                                            theta=angles)  # finding lines in the image using houghs transform # thresh was 35 for siren
         horizLines, vertLines = sortLines(lines)  # sorting found lines into horizontal and vertical categories
 
         for line in horizLines:
@@ -188,9 +198,54 @@ def wireScanHough(image, minWireLength=10, borderSize=15):
                 wire = WireVert(top, bottom, line.start[1], line.start[1], image.binarySkeleton)
                 if not wireCheck(VertWires, wire):
                     VertWires.append(wire)
-    HorizWires, VertWires = sortWiresHough(HorizWires, VertWires, image)
-    return HorizWires, VertWires
+        # Process horizontal lines
+        for line in horizLines:
+            wire = WireHoriz(line.start[0], line.start[0], line.start[1], line.end[1], image.binarySkeleton)
+            if not wireCheck(HorizWires, wire):
+                HorizWires.append(wire)
 
+        # Process vertical lines
+        for line in vertLines:
+            wire = WireVert(line.start[0], line.end[0], line.start[1], line.start[1], image.binarySkeleton)
+            if not wireCheck(VertWires, wire):
+                VertWires.append(wire)
+
+        # Collect endpoints from horiz & vert lines
+        endpoints = set()
+        for w in HorizWires:
+            endpoints.add(w.start)
+            endpoints.add(w.end)
+        for w in VertWires:
+            endpoints.add(w.start)
+            endpoints.add(w.end)
+
+
+        # --- 2. Detect diagonals only at endpoints ---
+        diag1 = np.linspace(np.deg2rad(30), np.deg2rad(80), 50)     # Q1
+        diag2 = np.linspace(np.deg2rad(100), np.deg2rad(150), 50)   # Q2
+        diag3 = np.linspace(np.deg2rad(210), np.deg2rad(260), 50)   # Q3
+        diag4 = np.linspace(np.deg2rad(300), np.deg2rad(350), 50)   # Q4
+
+        diag_angles = np.concatenate([diag1, diag2, diag3, diag4])
+        diag_lines = probabilistic_hough_line(
+            image.binarySkeleton,
+            threshold=10,
+            line_length=30,
+            line_gap=2,
+            theta=diag_angles
+        )
+        for line in diag_lines:
+            (x0, y0), (x1, y1) = line
+            p1 = (y0, x0)
+            p2 = (y1, x1)
+
+            if is_close_to_endpoints(p1, endpoints, threshold) or is_close_to_endpoints(p2, endpoints, threshold):
+                wire = WireDiag(y0, y1, x0, x1, image.binarySkeleton)
+                if not wireCheck(DiagWires, wire):
+                    DiagWires.append(wire)
+    print("WIRES", len(HorizWires), len(VertWires), len(DiagWires))
+    HorizWires, VertWires, DiagWires = sortWiresHough(HorizWires, VertWires, DiagWires, image)
+    return HorizWires, VertWires, DiagWires
 
 def wireAdd(start, end, HorizWires, VertWires, image):
     """ Manually add a wire, debug function

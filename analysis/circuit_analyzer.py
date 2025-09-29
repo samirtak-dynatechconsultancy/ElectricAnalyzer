@@ -417,7 +417,7 @@ def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box
 
 
 
-def build_circuit_graph(horiz_wires, vert_wires, junction_points, text_boxes, bounding_box,
+def build_circuit_graph(horiz_wires, vert_wires, diag_wires, junction_points, text_boxes, bounding_box,
                        junction_threshold=JUNCTION_INTERSECTION_THRESHOLD, 
                        wire_connection_threshold=WIRE_CONNECTION_THRESHOLD):
     """
@@ -430,7 +430,7 @@ def build_circuit_graph(horiz_wires, vert_wires, junction_points, text_boxes, bo
     - junction_threshold: Distance threshold for wire-junction intersections
     - wire_connection_threshold: Distance threshold for wire endpoint connections
     """
-    all_wires = list(horiz_wires) + list(vert_wires)
+    all_wires = list(horiz_wires) + list(vert_wires) + list(diag_wires)
 
     intersections = find_line_junction_intersections(all_wires, junction_points, junction_threshold)
     wire_connections, manual_intersection_points = find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box, wire_connection_threshold)
@@ -643,16 +643,16 @@ def generate_maximally_distinct_colors(num_colors):
     
     return colors
 
-def assign_wire_colors_by_network(horiz_wires, vert_wires, junction_points, text_boxes, bounding_box,
+def assign_wire_colors_by_network(horiz_wires, vert_wires, diag_wires, junction_points, text_boxes, bounding_box,
                                  junction_threshold=JUNCTION_INTERSECTION_THRESHOLD,
                                  wire_connection_threshold=WIRE_CONNECTION_THRESHOLD):
     """
     Assign colors to wires based on connected networks.
     Wires connected through junctions or wire endpoint connections get the same color.
     """    
-    all_wires = list(horiz_wires) + list(vert_wires)
+    all_wires = list(horiz_wires) + list(vert_wires) + list(diag_wires)
     graph, wire_endpoints, junction_nodes, intersections, manual_intersection_points = build_circuit_graph(
-        horiz_wires, vert_wires, junction_points, text_boxes, bounding_box)
+        horiz_wires, vert_wires, diag_wires, junction_points, text_boxes, bounding_box)
     
     # Find connected components (networks) using DFS
     visited_nodes = set()
@@ -736,23 +736,22 @@ def assign_wire_colors_by_network(horiz_wires, vert_wires, junction_points, text
         
     return wire_colors, networks, network_colors
 
-def analyze_circuit_flow_improved(horiz_wires, vert_wires, junction_points, text_boxes, bounding_box, threshold=15, wire_connection_threshold=10):
+def analyze_circuit_flow_improved(horiz_wires, vert_wires, diag_wires, junction_points, text_boxes, bounding_box, threshold=15, wire_connection_threshold=10):
     """
     Improved circuit flow analysis that:
     1. Groups wires by connected networks (including wire-to-wire connections)
     2. Uses alternating colors for source/destination within each network
     3. Ensures proper flow direction visualization
     """    
-    all_wires = list(horiz_wires) + list(vert_wires)
     graph, wire_endpoints, junction_nodes, intersections, manual_intersection_points = build_circuit_graph(
-        horiz_wires, vert_wires, junction_points, text_boxes, bounding_box)
-    
+        horiz_wires, vert_wires, diag_wires, junction_points, text_boxes, bounding_box)
+
     # Find connected components and assign base colors
     # TODO: Check
     # wire_colors, networks, network_colors = assign_wire_colors_by_network(
     #     horiz_wires, vert_wires, junction_points, threshold, wire_connection_threshold)
     wire_colors, networks, network_colors = assign_wire_colors_by_network(
-        horiz_wires, vert_wires, junction_points, text_boxes, bounding_box)
+        horiz_wires, vert_wires, diag_wires, junction_points, text_boxes, bounding_box)
 
     num_networks = len(networks)
     unique_base_colors = generate_unique_colors(num_networks)
@@ -1002,7 +1001,7 @@ def line_detection_improved(image_path, text_boxes, bounding_box, draw_on_canvas
             raise ValueError(f"Could not read image from {image_path}")
         
         # Get wires
-        HorizWires, VertWires = wireScanHough(image)
+        HorizWires, VertWires, DiagWires = wireScanHough(image)
         img = image_path
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -1013,7 +1012,7 @@ def line_detection_improved(image_path, text_boxes, bounding_box, draw_on_canvas
             canvas = draw_on_canvas.copy()
 
         # Perform improved flow analysis
-        all_wires = list(HorizWires) + list(VertWires)
+        all_wires = list(HorizWires) + list(VertWires) + list(DiagWires)
         intersections = []
         wire_colors = {}
         networks = []
@@ -1023,7 +1022,7 @@ def line_detection_improved(image_path, text_boxes, bounding_box, draw_on_canvas
         if junction_points and enable_network_colors:
             intersections = find_line_junction_intersections(all_wires, junction_points)
             wire_colors, networks, network_colors, junction_nodes, manual_intersection_points = analyze_circuit_flow_improved(
-                HorizWires, VertWires, junction_points, text_boxes, bounding_box)
+                HorizWires, VertWires, DiagWires, junction_points, text_boxes, bounding_box)
             # print(f"Found {len(intersections)} line-junction intersections")
             # print(f"Identified {len(networks)} electrical networks")
 
@@ -1047,6 +1046,12 @@ def line_detection_improved(image_path, text_boxes, bounding_box, draw_on_canvas
             wire_idx_global = len(HorizWires) + idx
             if wire_idx_global in wires_connected_to_junction or is_long_enough(wire):
                 filtered_VertWires.append(wire)
+
+        filtered_DiagWires = []
+        for idx, wire in enumerate(DiagWires):
+            wire_idx_global = len(HorizWires) + len(VertWires) + idx
+            if wire_idx_global in wires_connected_to_junction or is_long_enough(wire):
+                filtered_DiagWires.append(wire)
 
         # --- Drawing function ---
         def draw_wire_improved(wire, wire_idx, canvas):
@@ -1091,9 +1096,12 @@ def line_detection_improved(image_path, text_boxes, bounding_box, draw_on_canvas
         for idx, wire in enumerate(filtered_VertWires):
             draw_wire_improved(wire, len(HorizWires) + idx, canvas)
 
+        for idx, wire in enumerate(filtered_DiagWires):
+            draw_wire_improved(wire, len(HorizWires) + len(VertWires) + idx, canvas)
+
         # print(f"Detected {len(filtered_HorizWires)} horizontal wires and {len(filtered_VertWires)} vertical wires after filtering")
 
-        return canvas, filtered_HorizWires, filtered_VertWires, junction_points
+        return canvas, filtered_HorizWires, filtered_VertWires, filtered_DiagWires, junction_points
 
     # except Exception as e:
     #     # print(f"Error in improved line detection: {e}")
@@ -1264,7 +1272,7 @@ def get_network_summary(connection_data):
 
 import math
 
-def extract_wire_connection_data(horiz_wires, vert_wires, junction_points, 
+def extract_wire_connection_data(horiz_wires, vert_wires, diag_wires, junction_points, 
                                wire_colors, intersections, bounding_boxes=None):
     """
     Extract wire connection data with start and end points grouped by unique colors.
@@ -1391,7 +1399,61 @@ def extract_wire_connection_data(horiz_wires, vert_wires, junction_points,
                 'wire_idx': wire_idx,
                 'type': 'end'
             })
-    
+
+    for idx, wire in enumerate(diag_wires):
+        wire_idx = len(horiz_wires) + len(vert_wires) + idx
+        wire_intersections = [i for i in intersections if i['wire_idx'] == wire_idx]
+        modified_line = extend_line_through_junctions(wire, wire_intersections)
+        y1, y2, x1, x2 = modified_line
+        pt_start = (int(x1), int(y1))
+        pt_end = (int(x2), int(y2))
+        
+        # Skip if line is in bounding box
+        if line_in_box(pt_start, pt_end, bounding_boxes):
+            continue
+            
+        # Get wire colors
+        colors = wire_colors.get(wire_idx, {})
+        network_color = colors.get('network_color', (0, 0, 0))
+        
+        # Calculate length
+        length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        
+        # Add to connection data
+        if network_color not in connection_data:
+            connection_data[network_color] = {
+                'segments': [],
+                'network_id': len(connection_data),
+                'total_length': 0.0,
+                'wire_count': 0,
+                'start_points': [],
+                'end_points': []
+            }
+        
+        connection_data[network_color]['segments'].append((pt_start, pt_end))
+        connection_data[network_color]['total_length'] += length
+        connection_data[network_color]['wire_count'] += 1
+        
+        # Track endpoint colors for flow analysis
+        start_color = colors.get('start_color')
+        end_color = colors.get('end_color')
+        
+        if start_color is not None:
+            connection_data[network_color]['start_points'].append({
+                'point': pt_start,
+                'color': start_color,
+                'wire_idx': wire_idx,
+                'type': 'start'
+            })
+            
+        if end_color is not None:
+            connection_data[network_color]['end_points'].append({
+                'point': pt_end,
+                'color': end_color,
+                'wire_idx': wire_idx,
+                'type': 'end'
+            })
+
     return connection_data
 
 def get_network_distinct_points(connection_data, junction_points, threshold=WIRE_CONNECTION_THRESHOLD, junction_threshold=JUNCTION_INTERSECTION_THRESHOLD):
@@ -1888,7 +1950,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
     # Step 3: Improved line detection
     # print("\n=== STEP 3: Improved Line Detection ===")
     # Perform improved line detection
-    line_canvas, horiz_wires, vert_wires, junction_points = line_detection_improved(
+    line_canvas, horiz_wires, vert_wires, diag_wires, junction_points = line_detection_improved(
         text_redacted_img, junction_points=junction_points, text_boxes=boxes, bounding_box=bounding_boxes, enable_network_colors=enable_network_colors)
 
     if line_canvas is not None:
@@ -1899,13 +1961,13 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         combined_canvas = cropped_img.copy()
         
         # Perform network analysis for combined view
-        all_wires = list(horiz_wires) + list(vert_wires)
+        all_wires = list(horiz_wires) + list(vert_wires) + list(diag_wires)
         endpoint_points = []  # (point, color, wire_idx)
 
         if enable_network_colors:
             intersections = find_line_junction_intersections(all_wires, junction_points)
             wire_colors, networks, network_colors, junction_nodes, manual_intersection_points = analyze_circuit_flow_improved(
-                horiz_wires, vert_wires, junction_points, text_boxes=boxes, bounding_box=bounding_boxes)
+                horiz_wires, vert_wires, diag_wires, junction_points, text_boxes=boxes, bounding_box=bounding_boxes)
         
             manual_set = {(int(x), int(y)) for x, y in manual_intersection_points}
 
@@ -1978,6 +2040,39 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                     cv2.circle(combined_canvas, pt_end, 6, (0, 0, 0), 2)
                     endpoint_points.append((pt_end, colors['end_color'], idx))
 
+            for idx, wire in enumerate(diag_wires):
+                wire_idx = len(horiz_wires) + len(vert_wires) + idx
+                wire_intersections = [i for i in intersections if i['wire_idx'] == wire_idx]
+                modified_line = extend_line_through_junctions(wire, wire_intersections)
+                y1, y2, x1, x2 = modified_line
+                pt_start = (int(x1), int(y1))
+                pt_end = (int(x2), int(y2))
+                length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                # if is_near_manual_point(pt_start, manual_set) or is_near_manual_point(pt_end, manual_set):
+                #     # Optional: Debug print to confirm
+                #     print(f"Skipping {pt_start}->{pt_end} (close to manual intersection)")
+                #     continue
+
+
+                # Get wire colors
+                colors = wire_colors.get(wire_idx, {})
+                line_color = colors.get('network_color', (0, 0, 0))
+                
+                if line_in_box(pt_start, pt_end, bounding_boxes):
+                    continue
+                cv2.line(combined_canvas, pt_start, pt_end, line_color, 2, cv2.LINE_AA)
+                cv2.putText(combined_canvas, str(wire_idx), (pt_start[0]+5, pt_start[1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
+                
+                # Add endpoint markers
+                if colors.get('start_color') is not None:
+                    cv2.circle(combined_canvas, pt_start, 6, colors['start_color'], -1)
+                    cv2.circle(combined_canvas, pt_start, 6, (0, 0, 0), 2)
+                    endpoint_points.append((pt_start, colors['start_color'], idx))
+
+                if colors.get('end_color') is not None:
+                    cv2.circle(combined_canvas, pt_end, 6, colors['end_color'], -1)
+                    cv2.circle(combined_canvas, pt_end, 6, (0, 0, 0), 2)
+                    endpoint_points.append((pt_end, colors['end_color'], idx))
         # points_by_color = defaultdict(list)
         # for pt, col, w_idx in endpoint_points:
         #     points_by_color[col].append((pt, w_idx))
@@ -2009,7 +2104,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         # print(f"Text boxes removed: {len(boxes) if boxes else 0}")
     
         connection_data = extract_wire_connection_data(
-            horiz_wires, vert_wires, junction_points, 
+            horiz_wires, vert_wires, diag_wires, junction_points, 
             wire_colors, intersections, bounding_boxes
         )
         network_points = get_network_distinct_points(connection_data, junction_points, WIRE_CONNECTION_THRESHOLD, JUNCTION_INTERSECTION_THRESHOLD)

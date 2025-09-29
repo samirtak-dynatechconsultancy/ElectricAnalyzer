@@ -632,6 +632,24 @@ class WireVert:
         wireBorder = [top, bottom, left, right]
         return wireBorder
 
+class WireDiag:
+    def __init__(self, y1, y2, x1, x2, binaryImage):
+        # For diagonal wires, we need to handle the bounding box properly
+        min_y, max_y = min(y1, y2), max(y1, y2)
+        min_x, max_x = min(x1, x2), max(x1, x2)
+        
+        self.wire = binaryImage[min_y:max_y+1, min_x:max_x+1]
+        self.length = math.hypot(abs(x2 - x1), abs(y2 - y1))
+        self.centre_x = int((x1 + x2) / 2)
+        self.centre_y = int((y1 + y2) / 2)
+        self.line = y1, y2, x1, x2
+        self.start = y1, x1
+        self.end = y2, x2
+        self.angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+        self.junctionStart = False
+        self.junctionEnd = False
+        self.componentStart = False
+        self.componentEnd = False
 
 # Wire Junctions class
 class WireJunctions:
