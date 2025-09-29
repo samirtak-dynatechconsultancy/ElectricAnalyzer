@@ -10,3 +10,4 @@ venv_new
 results
 *.pdf
 *.png
+*.db
