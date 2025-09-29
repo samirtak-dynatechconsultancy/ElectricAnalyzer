@@ -11,3 +11,4 @@ results
 *.pdf
 *.png
 *.db
+actions_diaglines_test.py
