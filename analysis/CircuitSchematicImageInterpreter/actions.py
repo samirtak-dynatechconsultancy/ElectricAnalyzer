@@ -135,6 +135,48 @@ def is_close_to_endpoints(p, endpoints, threshold=25):
             return True
     return False
 
+def are_lines_close(line1, line2, dist_thresh=10, angle_thresh=5):
+    """Check if two lines are close enough to be considered duplicates."""
+    (x0, y0), (x1, y1) = line1
+    (x2, y2), (x3, y3) = line2
+
+    # Compute midpoints
+    mid1 = ((x0 + x1) / 2, (y0 + y1) / 2)
+    mid2 = ((x2 + x3) / 2, (y2 + y3) / 2)
+
+    # Distance between midpoints
+    dist = math.hypot(mid1[0] - mid2[0], mid1[1] - mid2[1])
+    if dist > dist_thresh:
+        return False
+
+    # Compute angles
+    angle1 = math.degrees(math.atan2(y1 - y0, x1 - x0))
+    angle2 = math.degrees(math.atan2(y3 - y2, x3 - x2))
+    angle_diff = abs(angle1 - angle2)
+
+    if angle_diff > 180:
+        angle_diff = 360 - angle_diff  # normalize
+
+    return angle_diff <= angle_thresh
+
+
+def filter_close_lines(lines, dist_thresh=10, angle_thresh=5):
+    """Remove nearly-duplicate diagonal lines by clustering nearby ones."""
+    filtered = []
+    for line in lines:
+        if not any(are_lines_close(line, kept, dist_thresh, angle_thresh) for kept in filtered):
+            filtered.append(line)
+    return filtered
+
+def is_duplicate_diag(new_wire, existing_wires, tolerance=3):
+    """Check if diagonal wire is too similar to existing ones"""
+    for w in existing_wires:
+        if (abs(w.top - new_wire.top) <= tolerance and 
+            abs(w.bottom - new_wire.bottom) <= tolerance and
+            abs(w.left - new_wire.left) <= tolerance and
+            abs(w.right - new_wire.right) <= tolerance):
+            return True
+    return False
 
 def wireScanHough(image, minWireLength=10, borderSize=15):
     """ Scans for wires using Hough's transform - diagonals only if connected to horiz/vert lines """
@@ -234,7 +276,9 @@ def wireScanHough(image, minWireLength=10, borderSize=15):
             line_gap=2,
             theta=diag_angles
         )
-        for line in diag_lines:
+        filtered_diag_lines = filter_close_lines(diag_lines, dist_thresh=15, angle_thresh=7)
+
+        for line in filtered_diag_lines:
             (x0, y0), (x1, y1) = line
             p1 = (y0, x0)
             p2 = (y1, x1)
@@ -243,8 +287,8 @@ def wireScanHough(image, minWireLength=10, borderSize=15):
                 wire = WireDiag(y0, y1, x0, x1, image.binarySkeleton)
                 if not wireCheck(DiagWires, wire):
                     DiagWires.append(wire)
-    print("WIRES", len(HorizWires), len(VertWires), len(DiagWires))
     HorizWires, VertWires, DiagWires = sortWiresHough(HorizWires, VertWires, DiagWires, image)
+    print("WIRES", len(HorizWires), len(VertWires), len(DiagWires))
     return HorizWires, VertWires, DiagWires
 
 def wireAdd(start, end, HorizWires, VertWires, image):

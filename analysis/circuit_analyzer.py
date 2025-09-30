@@ -354,7 +354,7 @@ def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box
                         label2 = find_closest_text("source", proj_point, text_boxes)
                         
                         if not is_prohibited_connection(label1, label2):
-                            print(f"Wire {i} start connects perpendicularly to wire {j} line at {proj_point} (dist {dist})")
+                            # print(f"Wire {i} start connects perpendicularly to wire {j} line at {proj_point} (dist {dist})")
                             connections.append((i, 'start', j, 'end', dist))
                             # Store the intersection details
                             intersection_points.append(proj_point)
@@ -372,7 +372,7 @@ def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box
                         label2 = find_closest_text("source", proj_point, text_boxes)
                         
                         if not is_prohibited_connection(label1, label2):
-                            print(f"Wire {i} end connects perpendicularly to wire {j} line at {proj_point} (dist {dist})")
+                            # print(f"Wire {i} end connects perpendicularly to wire {j} line at {proj_point} (dist {dist})")
                             connections.append((i, 'end', j, 'start', dist))
                             # Store the intersection details
                             intersection_points.append(proj_point)
@@ -390,7 +390,7 @@ def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box
                         label2 = find_closest_text("source", proj_point, text_boxes)
                         
                         if not is_prohibited_connection(label1, label2):
-                            print(f"Wire {j} start connects perpendicularly to wire {i} line at {proj_point} (dist {dist})")
+                            # print(f"Wire {j} start connects perpendicularly to wire {i} line at {proj_point} (dist {dist})")
                             connections.append((j, 'start', i, 'end', dist))
                             # Store the intersection details
                             intersection_points.append(proj_point)
@@ -408,7 +408,7 @@ def find_wire_endpoint_connections_with_text(all_wires, text_boxes, bounding_box
                         label2 = find_closest_text("source", proj_point, text_boxes)
                         
                         if not is_prohibited_connection(label1, label2):
-                            print(f"Wire {j} end connects perpendicularly to wire {i} line at {proj_point} (dist {dist})")
+                            # print(f"Wire {j} end connects perpendicularly to wire {i} line at {proj_point} (dist {dist})")
                             connections.append((j, 'end', i, 'start', dist))
                             # Store the intersection details
                             intersection_points.append(proj_point)
