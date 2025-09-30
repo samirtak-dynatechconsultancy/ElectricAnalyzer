@@ -252,7 +252,6 @@ def optimize_file():
 @main.route('/analyze', methods=['POST'])
 def analyze_circuit():
     try:
-        print(session)
         folder_path = os.path.join(RESULTS_FOLDER, session.get('id', 'guest'))
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path)  # Deletes folder + all files inside it
