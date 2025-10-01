@@ -2282,37 +2282,37 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         df_connections = df_connections.drop_duplicates(subset=["source_component", "source_terminal",
             "dest_component", "dest_terminal"], keep="last")
 
-        # Create connection map using the actual index (not positional)
-        conn_map = {
-            (row.source_component, row.source_terminal): idx
-            for idx, row in df_connections.iterrows()
-        }
+        # # Create connection map using the actual index (not positional)
+        # conn_map = {
+        #     (row.source_component, row.source_terminal): idx
+        #     for idx, row in df_connections.iterrows()
+        # }
 
-        # Find starting points = rows whose source is not a dest of any other row
-        dest_pairs = set(zip(df_connections.dest_component, df_connections.dest_terminal))
-        start_indices = [
-            idx for idx, row in df_connections.iterrows()
-            if (row.source_component, row.source_terminal) not in dest_pairs
-        ]
+        # # Find starting points = rows whose source is not a dest of any other row
+        # dest_pairs = set(zip(df_connections.dest_component, df_connections.dest_terminal))
+        # start_indices = [
+        #     idx for idx, row in df_connections.iterrows()
+        #     if (row.source_component, row.source_terminal) not in dest_pairs
+        # ]
 
-        # Traverse from each starting point to build ordered chains
-        ordered_indices = []
-        visited = set()  # Track visited to avoid infinite loops
+        # # Traverse from each starting point to build ordered chains
+        # ordered_indices = []
+        # visited = set()  # Track visited to avoid infinite loops
 
-        for start_idx in start_indices:
-            idx = start_idx
-            while idx is not None and idx not in visited:
-                ordered_indices.append(idx)
-                visited.add(idx)
-                row = df_connections.loc[idx]  # Use .loc instead of .iloc
-                next_idx = conn_map.get((row.dest_component, row.dest_terminal))
-                idx = next_idx
+        # for start_idx in start_indices:
+        #     idx = start_idx
+        #     while idx is not None and idx not in visited:
+        #         ordered_indices.append(idx)
+        #         visited.add(idx)
+        #         row = df_connections.loc[idx]  # Use .loc instead of .iloc
+        #         next_idx = conn_map.get((row.dest_component, row.dest_terminal))
+        #         idx = next_idx
 
-        # Reorder dataframe
-        df_connections = df_connections.loc[ordered_indices].reset_index(drop=True)
+        # # Reorder dataframe
+        # df_connections = df_connections.loc[ordered_indices].reset_index(drop=True)
 
-        # Reassign index_no after sorting
-        df_connections["index_no"] = df_connections.index + 1
+        # # Reassign index_no after sorting
+        # df_connections["index_no"] = df_connections.index + 1
 
         # Now draw images
         drawn_lines_lst = draw_connections_from_df_connections(
