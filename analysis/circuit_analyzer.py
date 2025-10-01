@@ -1894,10 +1894,17 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             xyxy = box.xyxy.cpu().numpy()[0]  # [xmin, ymin, xmax, ymax]
             cls_id = int(box.cls.cpu().numpy()[0])
             class_name = result.names[cls_id]
+            conf = float(box.conf.cpu().numpy()[0])  # actual model confidence
+
             if 'drawout' in class_name.lower():
                 continue
 
-            # Cast to native Python float
+            # Set threshold based on class
+            threshold = 0 if 'capacitor' in class_name.lower() else 0.5
+            if conf < threshold:
+                continue  # skip boxes below threshold
+
+            # Cast to int
             xmin, ymin, xmax, ymax = [int(v) for v in xyxy]
 
             if 'other' in class_name.lower():
@@ -1907,6 +1914,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 ymax += 10
 
             bounding_boxes.append((xmin, ymin, xmax, ymax, class_name))
+
 
     draw_results_on_image(bounding_boxes, cropped_img.copy())
     # 5/0
@@ -2214,9 +2222,9 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
             source_component = find_component_with_id(source_point, bounding_boxes)
             source_terminal = find_closest_text(source_component, source_point, boxes)
 
-            if source_terminal and 'terminal' in source_terminal.lower():
-                source_component = 'Terminal'
-                source_terminal = source_terminal.replace('Terminal', '').strip() 
+            # if source_terminal and 'term' in source_terminal.lower():
+            #     source_component = 'Term'
+            #     source_terminal = source_terminal.replace('Term', '').strip() 
 
             for target_point in sorted_points[1:]:
                 dest_component = find_component_with_id(target_point, bounding_boxes)
@@ -2233,9 +2241,9 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 if source_component and dest_component and "multi" in source_component.lower() and "sheild" in dest_component.lower():
                     continue
 
-                if dest_terminal and 'terminal' in dest_terminal.lower():
-                    dest_component = 'Terminal'
-                    dest_terminal = dest_terminal.replace('Terminal', '').strip() 
+                # if dest_terminal and 'term' in dest_terminal.lower():
+                #     dest_component = 'Term'
+                #     dest_terminal = dest_terminal.replace('Term', '').strip() 
 
                 # Append coordinates too
                 records_new.append((
@@ -2274,6 +2282,38 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         df_connections = df_connections.drop_duplicates(subset=["source_component", "source_terminal",
             "dest_component", "dest_terminal"], keep="last")
 
+        # Create connection map using the actual index (not positional)
+        conn_map = {
+            (row.source_component, row.source_terminal): idx
+            for idx, row in df_connections.iterrows()
+        }
+
+        # Find starting points = rows whose source is not a dest of any other row
+        dest_pairs = set(zip(df_connections.dest_component, df_connections.dest_terminal))
+        start_indices = [
+            idx for idx, row in df_connections.iterrows()
+            if (row.source_component, row.source_terminal) not in dest_pairs
+        ]
+
+        # Traverse from each starting point to build ordered chains
+        ordered_indices = []
+        visited = set()  # Track visited to avoid infinite loops
+
+        for start_idx in start_indices:
+            idx = start_idx
+            while idx is not None and idx not in visited:
+                ordered_indices.append(idx)
+                visited.add(idx)
+                row = df_connections.loc[idx]  # Use .loc instead of .iloc
+                next_idx = conn_map.get((row.dest_component, row.dest_terminal))
+                idx = next_idx
+
+        # Reorder dataframe
+        df_connections = df_connections.loc[ordered_indices].reset_index(drop=True)
+
+        # Reassign index_no after sorting
+        df_connections["index_no"] = df_connections.index + 1
+
         # Now draw images
         drawn_lines_lst = draw_connections_from_df_connections(
             df_connections=df_connections,
@@ -2309,24 +2349,23 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
         api_key = "AIzaSyC9Vj0VA8aP1ThOBjR7J1MK-6eluxLCnsE"
         client = genai.Client(api_key=api_key)
 
-        def map_components_to_logical_names(new_bounding_boxes, cv2_image, csv_path="component_mapping.csv"):
+        def map_components_to_actual_names(new_bounding_boxes, cv2_image, csv_path="component_mapping.csv"):
             # Convert bounding boxes to string
             bbox_description = "\n".join(
                 [f"ID: {uid}, Component: {name}, Coords: ({x1},{y1},{x2},{y2})"
                 for x1, y1, x2, y2, name, uid in new_bounding_boxes]
             )
             
+            height, width = cv2_image.shape[:2]
+
             # Your prompt remains the same
             prompt = f"""
                 You are given an image of a circuit diagram and a list of components:
                 {bbox_description}
 
-                **Absolute Rules - DO NOT DEVIATE:**
-                1.  **No Sequential Inference:** You MUST IGNORE any perceived numerical or alphabetical order. Component labels in schematics are not always sequential. The first current transformer (CT) component you see could be labeled 'CT3', and the next could be 'CT1'. This is normal and correct.
-                2.  **No "Correcting":** Do not change a label to fit a sequence. If the label in the image is clearly 'CT3', its logical name is 'CT3'. This is not an error to be fixed.
-                2.1. **Switch Components:** If the system analyzes a component in the diagram that is clearly labeled "S3", its logical_name becomes "S3". The system will not "correct" it to "S1" just because it's the first one it found.
-                3.  **Visual Evidence Only:** Rely strictly on the text that is visibly printed in the image. Do not hallucinate or guess names.
-                Return the results as a JSON dictionary with 'unique_id' as the key and 'logical_name' as the value.
+                Give actual name of the component based on the unique component names provided in the description above
+                Return the results as a JSON dictionary with 'unique_id' as the key and 'actual_name' as the value.
+                Don't add the key value pair if the 'actual_name' is not present.
             """
 
             # 1. Encode cv2 image to PNG bytes
@@ -2363,9 +2402,9 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
                 # Save CSV (your existing code is fine here)
                 with open(csv_path, "w", newline="") as f:
                     writer = csv.writer(f)
-                    writer.writerow(["unique_id", "logical_name"])
-                    for uid, logical_name in mapping.items():
-                        writer.writerow([uid, logical_name])
+                    writer.writerow(["unique_id", "actual_name"])
+                    for uid, actual_name in mapping.items():
+                        writer.writerow([uid, actual_name])
                 
                 print(f"Successfully parsed JSON and saved to {csv_path}")
 
@@ -2377,7 +2416,7 @@ def combined_circuit_analysis_improved(pdf_file, page_no, crop_params=None, enab
 
         try:
             5/0
-            result = map_components_to_logical_names(new_bounding_boxes, cropped_img)
+            result = map_components_to_actual_names(new_bounding_boxes, cropped_img)
 
             def map_component(name):
                 if pd.isna(name):  # handle NaN values

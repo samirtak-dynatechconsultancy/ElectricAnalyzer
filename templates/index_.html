@@ -1380,7 +1380,7 @@ function ensureCanvasContainerSize() {
             const currentPageNum = pageKeys[pageIndex];
             const images = groupedImages[currentPageNum];
             if (images == undefined) {
-                throw new Error("Not able to classify the images on this page");
+                throw new Error("No Circuit Diagram Detected on this page");
             }
 
             let imagesPerPage = images.length;

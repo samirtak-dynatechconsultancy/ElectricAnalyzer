@@ -125,8 +125,6 @@ def wireCheck(Wires, Wire):
             duplicateWire = True
     return duplicateWire
 
-
-
 threshold = 25  # pixels
 
 def is_close_to_endpoints(p, endpoints, threshold=25):
@@ -135,50 +133,8 @@ def is_close_to_endpoints(p, endpoints, threshold=25):
             return True
     return False
 
-def are_lines_close(line1, line2, dist_thresh=10, angle_thresh=5):
-    """Check if two lines are close enough to be considered duplicates."""
-    (x0, y0), (x1, y1) = line1
-    (x2, y2), (x3, y3) = line2
 
-    # Compute midpoints
-    mid1 = ((x0 + x1) / 2, (y0 + y1) / 2)
-    mid2 = ((x2 + x3) / 2, (y2 + y3) / 2)
-
-    # Distance between midpoints
-    dist = math.hypot(mid1[0] - mid2[0], mid1[1] - mid2[1])
-    if dist > dist_thresh:
-        return False
-
-    # Compute angles
-    angle1 = math.degrees(math.atan2(y1 - y0, x1 - x0))
-    angle2 = math.degrees(math.atan2(y3 - y2, x3 - x2))
-    angle_diff = abs(angle1 - angle2)
-
-    if angle_diff > 180:
-        angle_diff = 360 - angle_diff  # normalize
-
-    return angle_diff <= angle_thresh
-
-
-def filter_close_lines(lines, dist_thresh=10, angle_thresh=5):
-    """Remove nearly-duplicate diagonal lines by clustering nearby ones."""
-    filtered = []
-    for line in lines:
-        if not any(are_lines_close(line, kept, dist_thresh, angle_thresh) for kept in filtered):
-            filtered.append(line)
-    return filtered
-
-def is_duplicate_diag(new_wire, existing_wires, tolerance=3):
-    """Check if diagonal wire is too similar to existing ones"""
-    for w in existing_wires:
-        if (abs(w.top - new_wire.top) <= tolerance and 
-            abs(w.bottom - new_wire.bottom) <= tolerance and
-            abs(w.left - new_wire.left) <= tolerance and
-            abs(w.right - new_wire.right) <= tolerance):
-            return True
-    return False
-
-def wireScanHough(image, minWireLength=10, borderSize=15):
+def wireScanHough(image, minWireLength=10, borderSize=15, min_final_length=15):
     """ Scans for wires using Hough's transform - diagonals only if connected to horiz/vert lines """
 
     HorizWires = []
@@ -263,33 +219,158 @@ def wireScanHough(image, minWireLength=10, borderSize=15):
 
 
         # --- 2. Detect diagonals only at endpoints ---
-        diag1 = np.linspace(np.deg2rad(30), np.deg2rad(80), 50)     # Q1
-        diag2 = np.linspace(np.deg2rad(100), np.deg2rad(150), 50)   # Q2
-        diag3 = np.linspace(np.deg2rad(210), np.deg2rad(260), 50)   # Q3
-        diag4 = np.linspace(np.deg2rad(300), np.deg2rad(350), 50)   # Q4
+        diag_angles = np.concatenate([
+            np.linspace(np.deg2rad(15), np.deg2rad(75), 30),
+            np.linspace(np.deg2rad(105), np.deg2rad(165), 30),
+            np.linspace(np.deg2rad(195), np.deg2rad(255), 30),
+            np.linspace(np.deg2rad(285), np.deg2rad(345), 30)
+        ])
 
-        diag_angles = np.concatenate([diag1, diag2, diag3, diag4])
         diag_lines = probabilistic_hough_line(
             image.binarySkeleton,
-            threshold=10,
-            line_length=30,
-            line_gap=2,
+            threshold=20,
+            line_length=20,
+            line_gap=3,
             theta=diag_angles
         )
-        filtered_diag_lines = filter_close_lines(diag_lines, dist_thresh=15, angle_thresh=7)
 
-        for line in filtered_diag_lines:
+        for line in diag_lines:
             (x0, y0), (x1, y1) = line
             p1 = (y0, x0)
             p2 = (y1, x1)
-
-            if is_close_to_endpoints(p1, endpoints, threshold) or is_close_to_endpoints(p2, endpoints, threshold):
+            length = np.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)
+            angle = np.abs(np.arctan2(p2[1] - p1[1], p2[0] - p1[0]))
+            angle_deg = np.rad2deg(angle)
+            
+            if length > 25 and (30 < angle_deg < 60 or 120 < angle_deg < 150):
                 wire = WireDiag(y0, y1, x0, x1, image.binarySkeleton)
                 if not wireCheck(DiagWires, wire):
                     DiagWires.append(wire)
-    HorizWires, VertWires, DiagWires = sortWiresHough(HorizWires, VertWires, DiagWires, image)
+
+            
+    DiagWires = merge_overlapping_diagonals(DiagWires)
+
+    # HorizWires = [w for w in HorizWires if w.length >= min_final_length]
+    # VertWires = [w for w in VertWires if w.length >= min_final_length]
+    # DiagWires = [w for w in DiagWires if w.length >= min_final_length]
+
     print("WIRES", len(HorizWires), len(VertWires), len(DiagWires))
+    HorizWires, VertWires, DiagWires = sortWiresHough(HorizWires, VertWires, DiagWires, image)
     return HorizWires, VertWires, DiagWires
+
+
+def merge_overlapping_diagonals(DiagWires, angle_tolerance=0.2, distance_threshold=10, gap_threshold=15):
+    """Merge diagonal wires that represent the same physical line"""
+    if not DiagWires:
+        return []
+    
+    merged = []
+    used = [False] * len(DiagWires)
+    
+    for i, wire1 in enumerate(DiagWires):
+        if used[i]:
+            continue
+        
+        # Get angle of wire1 (use the stored angle)
+        angle1 = np.deg2rad(wire1.angle)
+        
+        # Find all wires that overlap with wire1
+        overlapping = [wire1]
+        used[i] = True
+        
+        for j, wire2 in enumerate(DiagWires[i+1:], start=i+1):
+            if used[j]:
+                continue
+            
+            angle2 = np.deg2rad(wire2.angle)
+            
+            # Check if angles are similar (accounting for 180° periodicity)
+            angle_diff = abs(angle1 - angle2)
+            angle_diff = min(angle_diff, abs(angle_diff - np.pi), abs(angle_diff + np.pi))
+            
+            if angle_diff > angle_tolerance:
+                continue
+            
+            # Check if wires are close (perpendicular distance)
+            dist1 = point_to_line_distance(wire2.start, wire1.start, wire1.end)
+            dist2 = point_to_line_distance(wire2.end, wire1.start, wire1.end)
+            
+            # Only consider if perpendicular distance is small
+            if dist1 > distance_threshold and dist2 > distance_threshold:
+                continue
+            
+            # NOW check if they're actually close along the line (not separated by a gap)
+            if wires_have_gap(wire1, wire2, gap_threshold):
+                continue
+            
+            overlapping.append(wire2)
+            used[j] = True
+        
+        # Merge all overlapping wires into one
+        if len(overlapping) > 1:
+            # Find the extreme points
+            all_points = []
+            for w in overlapping:
+                all_points.append(w.start)  # (y, x)
+                all_points.append(w.end)    # (y, x)
+            
+            # Get the two most distant points
+            max_dist = 0
+            p1, p2 = all_points[0], all_points[1]
+            for i in range(len(all_points)):
+                for j in range(i+1, len(all_points)):
+                    dist = np.sqrt((all_points[i][0] - all_points[j][0])**2 + 
+                                   (all_points[i][1] - all_points[j][1])**2)
+                    if dist > max_dist:
+                        max_dist = dist
+                        p1, p2 = all_points[i], all_points[j]
+            
+            # p1 and p2 are (y, x) tuples
+            merged_wire = WireDiag(p1[0], p2[0], p1[1], p2[1], wire1.wire)
+            merged.append(merged_wire)
+        else:
+            merged.append(wire1)
+    
+    return merged
+
+
+def wires_have_gap(wire1, wire2, gap_threshold):
+    """Check if two diagonal wires have a gap between them along the line direction"""
+    # Get all 4 endpoints
+    points = [wire1.start, wire1.end, wire2.start, wire2.end]
+    
+    # Find min distance between any endpoint of wire1 to any endpoint of wire2
+    min_dist = float('inf')
+    
+    # Distance from wire1.start to both wire2 endpoints
+    dist1 = np.sqrt((wire1.start[0] - wire2.start[0])**2 + (wire1.start[1] - wire2.start[1])**2)
+    dist2 = np.sqrt((wire1.start[0] - wire2.end[0])**2 + (wire1.start[1] - wire2.end[1])**2)
+    min_dist = min(min_dist, dist1, dist2)
+    
+    # Distance from wire1.end to both wire2 endpoints
+    dist3 = np.sqrt((wire1.end[0] - wire2.start[0])**2 + (wire1.end[1] - wire2.start[1])**2)
+    dist4 = np.sqrt((wire1.end[0] - wire2.end[0])**2 + (wire1.end[1] - wire2.end[1])**2)
+    min_dist = min(min_dist, dist3, dist4)
+    
+    # If the closest endpoints are farther than gap_threshold, there's a gap
+    return min_dist > gap_threshold
+
+
+def point_to_line_distance(point, line_start, line_end):
+    """Calculate perpendicular distance from point to line segment"""
+    # All inputs are (y, x) tuples
+    py, px = point
+    y1, x1 = line_start
+    y2, x2 = line_end
+    
+    # Line length
+    line_len = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+    if line_len == 0:
+        return np.sqrt((px - x1)**2 + (py - y1)**2)
+    
+    # Distance formula (perpendicular distance from point to infinite line)
+    distance = abs((y2 - y1) * px - (x2 - x1) * py + x2 * y1 - y2 * x1) / line_len
+    return distance
 
 def wireAdd(start, end, HorizWires, VertWires, image):
     """ Manually add a wire, debug function
