@@ -938,6 +938,7 @@ function ensureCanvasContainerSize() {
                 return;
             }
             unique_id+=1
+            console.log(unique_id)
             // First upload the PDF file to the backend (similar to the white box editor)
             const formData = new FormData();
             formData.append('file', pdfFileInput.files[0]);
