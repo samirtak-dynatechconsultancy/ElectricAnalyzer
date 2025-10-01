@@ -28,7 +28,6 @@ main = Blueprint('main', __name__)
 
 
 from functools import wraps
-count = 0
 def login_required(f):
     """Decorator to require login for protected routes"""
     @wraps(f)
@@ -47,6 +46,7 @@ def index():
 
 ALLOWED_EXTENSIONS = {'pdf'}
 box_counter = {}
+count = 0
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -124,6 +124,7 @@ def get_page(filename, page_num):
 @main.route('/add_white_box', methods=['POST'])
 def add_white_box():
     try:
+        global count
         count += 1
         data = request.json
         filename = data.get('filename')
@@ -241,6 +242,7 @@ def serve_result_file(unique_id, filename):
 @main.route('/optimize', methods=['POST'])
 def optimize_file():
     box_counter = {}
+    global count
     count = 0
     file_handler = FileHandler(current_app.config['UPLOAD_FOLDER'])
     files = file_handler.handle_uploads(request.files)
