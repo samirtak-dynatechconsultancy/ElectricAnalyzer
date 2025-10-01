@@ -128,7 +128,7 @@ def add_white_box():
         count += 1
         data = request.json
         filename = data.get('filename')
-
+        unique_id = data.get('unique_id')
         # Get the optimized file
         filename = filename.replace(".pdf", "_optimized.pdf")
         page_num = int(data.get('page_num'))
@@ -148,9 +148,7 @@ def add_white_box():
             box_counter[filename][page_num] = 0
         
         # Increment counter for this page
-        box_counter[filename][page_num] = count
-        current_id = box_counter[filename][page_num]
-        label_text = f"Term{current_id}"  # e.g. Terminal 1, Terminal 2, Terminal 3
+        label_text = f"Term{unique_id}"  # e.g. Terminal 1, Terminal 2, Terminal 3
         # Open PDF
         doc = fitz.open(filepath)
         page = doc[page_num]
@@ -195,7 +193,7 @@ def add_white_box():
         return jsonify({
             'success': True,
             'message': 'White box and text added successfully',
-            'id': current_id,
+            'id': unique_id,
             'label': label_text
         })
         

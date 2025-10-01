@@ -354,7 +354,7 @@
         let scaleX = 1;
         let scaleY = 1;
         const pageComponents = {}; // { pageNum: [ {x, y, width, height} ] }
-
+        let unique_id = 0
 
         
         // File input handlers with proper event binding
@@ -937,7 +937,7 @@ function ensureCanvasContainerSize() {
                 alert('No PDF file available');
                 return;
             }
-
+            unique_id+=1
             // First upload the PDF file to the backend (similar to the white box editor)
             const formData = new FormData();
             formData.append('file', pdfFileInput.files[0]);
@@ -961,7 +961,8 @@ function ensureCanvasContainerSize() {
                             x: x,
                             y: y,
                             width: width,
-                            height: height
+                            height: height,
+                            unique_id: unique_id
                         })
                     });
                 } else {
@@ -1089,6 +1090,7 @@ function ensureCanvasContainerSize() {
             statusDiv.textContent = "⏳ Uploading and analyzing...";
             statusDiv.className = "status-info";
             // Note: This will fail in the demo as there's no backend
+            unique_id = 0
             fetch('/analyze', {
                 method: 'POST',
                 body: formData
