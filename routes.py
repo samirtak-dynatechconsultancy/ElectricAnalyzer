@@ -148,8 +148,7 @@ def add_white_box():
         # Increment counter for this page
         box_counter[filename][page_num] += 1
         current_id = box_counter[filename][page_num]
-        label_text = f"Terminal {current_id}"  # e.g. Terminal 1, Terminal 2, Terminal 3
-
+        label_text = f"Term{current_id}"  # e.g. Terminal 1, Terminal 2, Terminal 3
         # Open PDF
         doc = fitz.open(filepath)
         page = doc[page_num]
@@ -174,7 +173,7 @@ def add_white_box():
         annot.update()
 
         # --- ADD TEXT IN THE CENTER ---
-        font_size = 0.1  # Scale font to fit box
+        font_size = 6  # Scale font to fit box
         text_rect = fitz.Rect(pdf_x1, pdf_y1, pdf_x2, pdf_y2)
 
         page.insert_textbox(
@@ -185,6 +184,8 @@ def add_white_box():
             align=1,              # Center alignment
             color=(0, 0, 0)       # Black text
         )
+        print("ADDING", label_text , "at", pdf_x1, pdf_y1, pdf_x2, pdf_y2)
+
         
         doc.save(filepath, incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
         doc.close()
@@ -252,6 +253,7 @@ def optimize_file():
 @main.route('/analyze', methods=['POST'])
 def analyze_circuit():
     try:
+        box_counter = {}
         folder_path = os.path.join(RESULTS_FOLDER, session.get('id', 'guest'))
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path)  # Deletes folder + all files inside it
