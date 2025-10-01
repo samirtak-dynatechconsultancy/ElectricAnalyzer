@@ -28,7 +28,7 @@ main = Blueprint('main', __name__)
 
 
 from functools import wraps
-
+count = 0
 def login_required(f):
     """Decorator to require login for protected routes"""
     @wraps(f)
@@ -124,6 +124,7 @@ def get_page(filename, page_num):
 @main.route('/add_white_box', methods=['POST'])
 def add_white_box():
     try:
+        count += 1
         data = request.json
         filename = data.get('filename')
 
@@ -146,7 +147,7 @@ def add_white_box():
             box_counter[filename][page_num] = 0
         
         # Increment counter for this page
-        box_counter[filename][page_num] += 1
+        box_counter[filename][page_num] = count
         current_id = box_counter[filename][page_num]
         label_text = f"Term{current_id}"  # e.g. Terminal 1, Terminal 2, Terminal 3
         # Open PDF
@@ -240,6 +241,7 @@ def serve_result_file(unique_id, filename):
 @main.route('/optimize', methods=['POST'])
 def optimize_file():
     box_counter = {}
+    count = 0
     file_handler = FileHandler(current_app.config['UPLOAD_FOLDER'])
     files = file_handler.handle_uploads(request.files)
     pdf_path = Path(files['pdf_path'])
